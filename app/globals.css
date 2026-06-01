@@ -1,0 +1,122 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: 245 245 245; /* #F5F5F5 */
+  --foreground: 17 17 17; /* #111111 */
+  --card: 255 255 255; /* #FFFFFF */
+  --card-foreground: 17 17 17; /* #111111 */
+  --popover: 255 255 255;
+  --popover-foreground: 17 17 17;
+  --primary: 17 17 17; /* #111111 */
+  --primary-foreground: 255 255 255;
+  --secondary: 34 34 34; /* #222222 */
+  --secondary-foreground: 255 255 255;
+  --muted: 229 229 229;
+  --muted-foreground: 102 102 102;
+  --accent: 29 158 117; /* #1D9E75 green */
+  --accent-foreground: 255 255 255;
+  --destructive: 163 45 45; /* #A32D2D red */
+  --destructive-foreground: 255 255 255;
+  --border: 229 229 229; /* #E5E5E5 */
+  --input: 255 255 255;
+  --ring: 29 158 117;
+  --chart-1: 29 158 117; /* green */
+  --chart-2: 184 79 11; /* amber */
+  --chart-3: 163 45 45; /* red */
+  --chart-4: 24 95 165; /* blue */
+  --chart-5: 15 110 86; /* dark green */
+  
+  /* Status colors */
+  --status-available: 29 158 117; /* #1D9E75 */
+  --status-available-bg: 225 245 238; /* #E1F5EE */
+  --status-available-text: 15 110 86; /* #0F6E56 */
+  
+  --status-pending: 250 237 218; /* #FAEEDA */
+  --status-pending-text: 133 79 11; /* #854F0B */
+  
+  --status-booked: 252 235 235; /* #FCEBEB */
+  --status-booked-text: 163 45 45; /* #A32D2D */
+  
+  --status-info: 230 241 251; /* #E6F1FB */
+  --status-info-text: 24 95 165; /* #185FA5 */
+  
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 20 20 20;
+  --foreground: 245 245 245;
+  --card: 26 26 26;
+  --card-foreground: 245 245 245;
+  --popover: 26 26 26;
+  --popover-foreground: 245 245 245;
+  --primary: 245 245 245;
+  --primary-foreground: 17 17 17;
+  --secondary: 42 42 42;
+  --secondary-foreground: 245 245 245;
+  --muted: 64 64 64;
+  --muted-foreground: 163 163 163;
+  --accent: 29 158 117;
+  --accent-foreground: 245 245 245;
+  --destructive: 163 45 45;
+  --destructive-foreground: 245 245 245;
+  --border: 42 42 42;
+  --input: 42 42 42;
+  --ring: 29 158 117;
+  --chart-1: 29 158 117;
+  --chart-2: 184 79 11;
+  --chart-3: 163 45 45;
+  --chart-4: 24 95 165;
+  --chart-5: 15 110 86;
+}
+
+@theme inline {
+  --font-sans: 'Inter', 'Inter Fallback';
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --color-background: rgb(var(--background));
+  --color-foreground: rgb(var(--foreground));
+  --color-card: rgb(var(--card));
+  --color-card-foreground: rgb(var(--card-foreground));
+  --color-popover: rgb(var(--popover));
+  --color-popover-foreground: rgb(var(--popover-foreground));
+  --color-primary: rgb(var(--primary));
+  --color-primary-foreground: rgb(var(--primary-foreground));
+  --color-secondary: rgb(var(--secondary));
+  --color-secondary-foreground: rgb(var(--secondary-foreground));
+  --color-muted: rgb(var(--muted));
+  --color-muted-foreground: rgb(var(--muted-foreground));
+  --color-accent: rgb(var(--accent));
+  --color-accent-foreground: rgb(var(--accent-foreground));
+  --color-destructive: rgb(var(--destructive));
+  --color-destructive-foreground: rgb(var(--destructive-foreground));
+  --color-border: rgb(var(--border));
+  --color-input: rgb(var(--input));
+  --color-ring: rgb(var(--ring));
+  --radius: var(--radius);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.7;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-medium text-foreground;
+  }
+  
+  h1 {
+    @apply text-2xl;
+  }
+  
+  h2 {
+    @apply text-xl;
+  }
+}
