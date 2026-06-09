@@ -35,7 +35,9 @@ public class Booking {
 
     private String notes;
 
-    private String status = "CONFIRMED";
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private BookingStatus status = BookingStatus.CONFIRMED;
 
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -55,8 +57,8 @@ public class Booking {
     public void setUserPhone(String userPhone) { this.userPhone = userPhone; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public BookingStatus getStatus() { return status; }
+    public void setStatus(BookingStatus status) { this.status = status; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
 }

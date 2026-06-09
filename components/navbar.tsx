@@ -16,7 +16,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 font-medium transition-opacity hover:opacity-80">
             <div className="flex h-8 w-8 items-center justify-center rounded bg-white text-primary">
-              🏸
+               🏸
             </div>
             <span className="hidden sm:inline">Sân Cầu Lông</span>
           </Link>

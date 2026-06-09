@@ -1,26 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
-import { ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react'
-
-const TIME_SLOTS = [
-  { label: '5:00-7:00', start: 5, end: 7 },
-  { label: '7:00-9:00', start: 7, end: 9 },
-  { label: '9:00-11:00', start: 9, end: 11 },
-  { label: '11:00-13:00', start: 11, end: 13 },
-  { label: '13:00-15:00', start: 13, end: 15 },
-  { label: '15:00-17:00', start: 15, end: 17 },
-  { label: '17:00-19:00', start: 17, end: 19 },
-  { label: '19:00-21:00', start: 19, end: 21 },
-  { label: '21:00-23:00', start: 21, end: 23 },
-]
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { TIME_SLOTS, getPrice, getDayType } from '@/lib/booking-pricing'
+import { saveBookingDraft } from '@/lib/booking-storage'
 
 const COURTS = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, name: `Sân ${i + 1}` }))
 
 export default function BookingPage() {
+  const router = useRouter()
+
   const getLocalDateString = (date: Date) => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -38,27 +30,14 @@ export default function BookingPage() {
   const [selectedCourts, setSelectedCourts] = useState<number[]>([])
   const [currentMonth, setCurrentMonth] = useState(new Date())
 
-  const getDayType = (date: Date) => {
-    const day = date.getDay()
-    if ([0, 6].includes(day)) return 'weekend'
-    return 'weekday'
-  }
-
-  const getPrice = (slot: (typeof TIME_SLOTS)[0], dayType: string) => {
-    const basePrice = slot.start >= 17 ? 69000 : 40000
-    const multiplier = dayType === 'weekend' ? 1.2 : 1
-    return Math.round(basePrice * multiplier)
-  }
-
   const date = parseLocalDate(selectedDate)
   const dayType = getDayType(date)
   const slot = selectedTimeSlot !== null ? TIME_SLOTS[selectedTimeSlot] : null
   const pricePerCourt = slot ? getPrice(slot, dayType) : 0
   const totalPrice = pricePerCourt * selectedCourts.length
 
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
-  }
+  const getDaysInMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+  const getFirstDayOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1).getDay()
 
   const isSameLocalDay = (a: Date, b: Date) =>
     a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
@@ -69,106 +48,35 @@ export default function BookingPage() {
     return a.getDate() < b.getDate()
   }
 
-  const isSlotDisabled = (slotIndex: number) => {
+  const isSlotDisabled = useCallback((slotIndex: number) => {
     const slotDef = TIME_SLOTS[slotIndex]
     const [y, m, d] = selectedDate.split('-').map(Number)
     const slotStart = new Date(y, m - 1, d, slotDef.start, 0, 0, 0)
     const now = new Date()
-    const minAllowed = new Date(now.getTime() + 60 * 60 * 1000) // at least 1 hour ahead
-
-    // If booking is for today, disallow slots that start before minAllowed
+    const minAllowed = new Date(now.getTime() + 60 * 60 * 1000)
     const selected = parseLocalDate(selectedDate)
-    if (isSameLocalDay(selected, now)) {
-      return slotStart < minAllowed
-    }
-
-    // for future dates allow
+    if (isSameLocalDay(selected, now)) return slotStart < minAllowed
     return false
-  }
+  }, [selectedDate])
 
   useEffect(() => {
-    // if currently selected time slot becomes invalid because of date change, clear it
     if (selectedTimeSlot !== null && isSlotDisabled(selectedTimeSlot)) {
       setSelectedTimeSlot(null)
     }
-  }, [selectedDate])
+  }, [selectedDate, selectedTimeSlot, isSlotDisabled])
 
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay()
-  }
-
-  const handlePrevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))
-  }
-
-  const handleNextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))
+  const handleContinue = () => {
+    if (!slot || selectedCourts.length === 0) return
+    saveBookingDraft({
+      date: selectedDate,
+      timeSlotIndex: selectedTimeSlot!,
+      courtIds: selectedCourts,
+    })
+    router.push('/booking/confirm')
   }
 
   const days = Array.from({ length: getDaysInMonth(currentMonth) }, (_, i) => i + 1)
   const emptyDays = Array(getFirstDayOfMonth(currentMonth)).fill(null)
-
-  const renderCalendar = () => {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={handlePrevMonth}
-            className="p-2 hover:bg-neutral-100 rounded transition-colors"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <h3 className="font-semibold">
-            {currentMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
-          </h3>
-          <button
-            onClick={handleNextMonth}
-            className="p-2 hover:bg-neutral-100 rounded transition-colors"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-7 gap-2 text-center text-sm">
-          {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((day) => (
-            <div key={day} className="font-medium text-muted-foreground py-2">
-              {day}
-            </div>
-          ))}
-          {emptyDays.map((_, i) => (
-            <div key={`empty-${i}`}></div>
-          ))}
-          {days.map((day) => {
-            const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-            const isSelected = dateStr === selectedDate
-            const today = new Date()
-            const cellDate = parseLocalDate(dateStr)
-            const isToday = isSameLocalDay(cellDate, today)
-            const isPast = isBeforeLocalDay(cellDate, today)
-
-            return (
-              <button
-                key={day}
-                onClick={() => !isPast && setSelectedDate(dateStr)}
-                disabled={isPast}
-                className={`py-2 rounded transition-colors ${
-                  isPast
-                    ? 'text-muted-foreground opacity-50 cursor-not-allowed'
-                    : isSelected
-                      ? 'bg-accent text-white font-medium'
-                      : isToday
-                        ? 'border-2 border-accent text-accent font-medium'
-                        : 'hover:bg-neutral-100'
-                }`}
-              >
-                {day}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -179,13 +87,14 @@ export default function BookingPage() {
           <h1 className="mb-8 text-3xl font-bold">Đặt sân cầu lông</h1>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Selection */}
+            {/* Left Column */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Step 1: Choose Time Slot */}
+
+              {/* Step 1: Time Slot */}
               <div className="rounded-xl border border-border bg-card p-6">
                 <h2 className="mb-4 text-lg font-semibold">Bước 1: Chọn khung giờ</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {TIME_SLOTS.map((slot, index) => {
+                  {TIME_SLOTS.map((s, index) => {
                     const disabled = isSlotDisabled(index)
                     return (
                       <button
@@ -200,20 +109,72 @@ export default function BookingPage() {
                             : 'border-border hover:border-accent'
                         }`}
                       >
-                        {slot.label}
+                        {s.label}
                       </button>
                     )
                   })}
                 </div>
               </div>
 
-              {/* Step 2: Choose Date */}
+              {/* Step 2: Date */}
               <div className="rounded-xl border border-border bg-card p-6">
                 <h2 className="mb-4 text-lg font-semibold">Bước 2: Chọn ngày</h2>
-                {renderCalendar()}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+                      className="p-2 hover:bg-neutral-100 rounded transition-colors"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+                    <h3 className="font-semibold">
+                      {currentMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
+                    </h3>
+                    <button
+                      onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+                      className="p-2 hover:bg-neutral-100 rounded transition-colors"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-2 text-center text-sm">
+                    {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((d) => (
+                      <div key={d} className="font-medium text-muted-foreground py-2">{d}</div>
+                    ))}
+                    {emptyDays.map((_, i) => <div key={`e-${i}`} />)}
+                    {days.map((day) => {
+                      const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                      const isSelected = dateStr === selectedDate
+                      const today = new Date()
+                      const cellDate = parseLocalDate(dateStr)
+                      const isToday = isSameLocalDay(cellDate, today)
+                      const isPast = isBeforeLocalDay(cellDate, today)
+
+                      return (
+                        <button
+                          key={day}
+                          onClick={() => !isPast && setSelectedDate(dateStr)}
+                          disabled={isPast}
+                          className={`py-2 rounded transition-colors ${
+                            isPast
+                              ? 'text-muted-foreground opacity-50 cursor-not-allowed'
+                              : isSelected
+                                ? 'bg-accent text-white font-medium'
+                                : isToday
+                                  ? 'border-2 border-accent text-accent font-medium'
+                                  : 'hover:bg-neutral-100'
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
 
-              {/* Step 3: Choose Courts */}
+              {/* Step 3: Courts */}
               <div className="rounded-xl border border-border bg-card p-6">
                 <h2 className="mb-4 text-lg font-semibold">Bước 3: Chọn sân</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
@@ -278,9 +239,7 @@ export default function BookingPage() {
                           <span key={court} className="inline-flex items-center gap-1 bg-accent/10 px-2 py-1 rounded text-accent text-xs font-medium">
                             Sân {court}
                             <button
-                              onClick={() =>
-                                setSelectedCourts((prev) => prev.filter((c) => c !== court))
-                              }
+                              onClick={() => setSelectedCourts((prev) => prev.filter((c) => c !== court))}
                               className="ml-1 hover:text-accent/80"
                             >
                               ✕
@@ -307,8 +266,9 @@ export default function BookingPage() {
                   </div>
                 </div>
 
-                <Link
-                  href={selectedCourts.length > 0 && slot ? '/booking/confirm' : '#'}
+                <button
+                  onClick={handleContinue}
+                  disabled={selectedCourts.length === 0 || !slot}
                   className={`block w-full rounded-lg py-3 text-center font-medium text-white transition-colors ${
                     selectedCourts.length > 0 && slot
                       ? 'bg-primary hover:bg-primary/90 cursor-pointer'
@@ -316,7 +276,7 @@ export default function BookingPage() {
                   }`}
                 >
                   Tiếp tục thanh toán
-                </Link>
+                </button>
               </div>
             </div>
           </div>

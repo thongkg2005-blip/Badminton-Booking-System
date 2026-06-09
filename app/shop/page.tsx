@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
 import { ShoppingCart, Star } from 'lucide-react'
 import PRODUCTS from '@/lib/products'
+import { useCart } from '@/contexts/cart-context'
 
 const CATEGORIES = Array.from(new Set(PRODUCTS.map((p) => p.category)))
 
@@ -13,14 +14,14 @@ const formatPrice = (value: number) =>
   `${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')} đ`
 
 export default function ShopPage() {
+  const { cartCount, addToCart } = useCart()
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'price-asc' | 'price-desc' | 'newest'>('newest')
-  const [cart, setCart] = useState<{ id: number; quantity: number }[]>([])
 
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = selectedCategory
       ? PRODUCTS.filter((p) => p.category === selectedCategory)
-      : PRODUCTS
+      : [...PRODUCTS]
 
     filtered.sort((a, b) => {
       if (sortBy === 'price-asc') return a.price - b.price
@@ -30,27 +31,6 @@ export default function ShopPage() {
 
     return filtered
   }, [selectedCategory, sortBy])
-
-  const handleAddToCart = (productId: number) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.id === productId)
-      if (existing) {
-        return prev.map((item) =>
-          item.id === productId ? { ...item, quantity: item.quantity + 1 } : item
-        )
-      }
-      return [...prev, { id: productId, quantity: 1 }]
-    })
-  }
-
-  const cartTotal = cart.reduce((total, item) => {
-    const product = PRODUCTS.find((p) => p.id === item.id)
-    if (!product) return total
-    const price = product.price * (1 - product.discount / 100)
-    return total + price * item.quantity
-  }, 0)
-
-  const cartCount = cart.reduce((count, item) => count + item.quantity, 0)
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -109,9 +89,7 @@ export default function ShopPage() {
                   <h3 className="mb-4 font-semibold">Sắp xếp</h3>
                   <select
                     value={sortBy}
-                    onChange={(e) =>
-                      setSortBy(e.target.value as 'price-asc' | 'price-desc' | 'newest')
-                    }
+                    onChange={(e) => setSortBy(e.target.value as 'price-asc' | 'price-desc' | 'newest')}
                     className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   >
                     <option value="newest">Mới nhất</option>
@@ -171,16 +149,16 @@ export default function ShopPage() {
                                   {formatPrice(product.price)}
                                 </span>
                                 <span className="inline-block bg-destructive text-white text-xs font-bold px-2 py-1 rounded">
-                                  {product.discount}%
+                                  -{product.discount}%
                                 </span>
                               </>
                             )}
                           </div>
                         </div>
 
-                        {/* Add to Cart Button */}
+                        {/* Add to Cart */}
                         <button
-                          onClick={() => handleAddToCart(product.id)}
+                          onClick={() => addToCart(product.id)}
                           className="mt-auto w-full rounded-lg bg-primary py-2 font-medium text-white transition-colors hover:bg-primary/90"
                         >
                           Thêm vào giỏ

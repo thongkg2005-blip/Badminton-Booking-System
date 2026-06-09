@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import Link from 'next/link'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
+import { TIME_SLOTS, getPrice, getDayType, formatCurrency } from '@/lib/booking-pricing'
+import { loadBookingDraft, saveBookingResult, clearBookingDraft } from '@/lib/booking-storage'
+import { backendJson } from '@/lib/backend-api'
 
 export default function BookingConfirmPage() {
   const router = useRouter()
@@ -13,35 +15,78 @@ export default function BookingConfirmPage() {
     phone: '',
     email: '',
     notes: '',
-    hasAccount: false,
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Load draft from localStorage
+  const draft = typeof window !== 'undefined' ? loadBookingDraft() : null
+
+  useEffect(() => {
+    if (!loadBookingDraft()) {
+      router.replace('/booking')
+    }
+  }, [router])
+
+  if (!draft) {
+    return null // will redirect
+  }
+
+  const date = (() => {
+    const [y, m, d] = draft.date.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  })()
+
+  const slot = TIME_SLOTS[draft.timeSlotIndex]
+  const dayType = getDayType(date)
+  const pricePerCourt = getPrice(slot, dayType)
+  const total = pricePerCourt * draft.courtIds.length
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
-    }))
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    router.push('/booking/success')
-    setIsLoading(false)
-  }
+    try {
+      const bookingIds: number[] = []
 
-  // Mock booking data - in real app, this would come from previous page
-  const bookingData = {
-    date: new Date().toLocaleDateString('vi-VN'),
-    time: '17:00-19:00',
-    courts: ['Sân 1', 'Sân 2'],
-    pricePerCourt: 69000,
-    total: 276000,
+      // Create one booking per court
+      for (const courtId of draft.courtIds) {
+        const result = await backendJson<{ id: number; status: string }>('/bookings', {
+          method: 'POST',
+          body: JSON.stringify({
+            courtId,
+            date: draft.date,
+            startTime: `${String(slot.start).padStart(2, '0')}:00`,
+            endTime: `${String(slot.end).padStart(2, '0')}:00`,
+            userName: formData.fullName,
+            userPhone: formData.phone || null,
+            notes: formData.notes || null,
+          }),
+        })
+        bookingIds.push(result.id)
+      }
+
+      saveBookingResult({
+        bookingIds,
+        courtIds: draft.courtIds,
+        date: draft.date,
+        timeSlotIndex: draft.timeSlotIndex,
+        total,
+        pricePerCourt,
+      })
+      clearBookingDraft()
+      router.push('/booking/success')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Đặt sân thất bại. Vui lòng thử lại.'
+      setError(message)
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -55,8 +100,13 @@ export default function BookingConfirmPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Form */}
             <div className="lg:col-span-2">
+              {error && (
+                <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
+                  ⚠ {error}
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Personal Info */}
                 <div className="rounded-xl border border-border bg-card p-6">
                   <h2 className="mb-4 text-lg font-semibold">Thông tin cá nhân</h2>
 
@@ -125,42 +175,12 @@ export default function BookingConfirmPage() {
                   </div>
                 </div>
 
-                {/* Account Option */}
-                <div className="rounded-xl border border-border bg-card p-6">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="hasAccount"
-                      checked={formData.hasAccount}
-                      onChange={handleChange}
-                      className="w-5 h-5 rounded border-border accent-accent cursor-pointer"
-                    />
-                    <span className="font-medium">Tôi có tài khoản</span>
-                  </label>
-
-                  {formData.hasAccount && (
-                    <div className="mt-4 space-y-4">
-                      <input
-                        type="text"
-                        placeholder="Tên đăng nhập"
-                        className="w-full rounded-lg border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
-                      />
-                      <input
-                        type="password"
-                        placeholder="Mật khẩu"
-                        className="w-full rounded-lg border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Submit Button */}
                 <button
                   type="submit"
                   disabled={isLoading || !formData.fullName || !formData.phone}
                   className="w-full rounded-lg bg-accent text-white py-3 font-medium transition-colors hover:bg-[rgb(15_110_86)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isLoading ? 'Đang xử lý...' : 'Xác nhận đặt sân'}
+                  {isLoading ? 'Đang đặt sân...' : 'Xác nhận đặt sân'}
                 </button>
               </form>
             </div>
@@ -173,46 +193,54 @@ export default function BookingConfirmPage() {
                 <div className="mb-6 space-y-3 text-sm">
                   <div className="pb-3 border-b border-border">
                     <p className="text-muted-foreground">Ngày đặt sân</p>
-                    <p className="font-medium">{bookingData.date}</p>
+                    <p className="font-medium">
+                      {date.toLocaleDateString('vi-VN', {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      })}
+                    </p>
                   </div>
 
                   <div className="pb-3 border-b border-border">
                     <p className="text-muted-foreground">Khung giờ</p>
-                    <p className="font-medium">{bookingData.time}</p>
+                    <p className="font-medium">{slot.label}</p>
                   </div>
 
                   <div className="pb-3 border-b border-border">
-                    <p className="text-muted-foreground">Sân</p>
+                    <p className="text-muted-foreground">Sân ({draft.courtIds.length} sân)</p>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {bookingData.courts.map((court) => (
+                      {draft.courtIds.sort((a, b) => a - b).map((id) => (
                         <span
-                          key={court}
+                          key={id}
                           className="inline-block bg-[rgb(225_245_238)] px-2 py-1 rounded text-[rgb(15_110_86)] text-xs font-medium"
                         >
-                          {court}
+                          Sân {id}
                         </span>
                       ))}
                     </div>
                   </div>
 
-                  <div className="pt-3">
+                  <div className="pt-2">
                     <div className="flex justify-between mb-2">
                       <span className="text-muted-foreground">Giá/sân</span>
-                      <span className="font-medium">{bookingData.pricePerCourt.toLocaleString()} đ</span>
+                      <span className="font-medium">{formatCurrency(pricePerCourt)}</span>
                     </div>
                     <div className="flex justify-between text-lg font-bold text-accent border-t border-border pt-3">
                       <span>Tổng cộng</span>
-                      <span>{bookingData.total.toLocaleString()} đ</span>
+                      <span>{formatCurrency(total)}</span>
                     </div>
                   </div>
                 </div>
 
-                <Link
-                  href="/booking"
+                <button
+                  type="button"
+                  onClick={() => router.back()}
                   className="block w-full text-center text-sm text-accent hover:underline mb-3"
                 >
-                  Quay lại chỉnh sửa
-                </Link>
+                  ← Quay lại chỉnh sửa
+                </button>
               </div>
             </div>
           </div>

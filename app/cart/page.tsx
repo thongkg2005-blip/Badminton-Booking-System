@@ -1,25 +1,20 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
 import { Trash2, Plus, Minus } from 'lucide-react'
 import PRODUCTS from '@/lib/products'
+import { useCart } from '@/contexts/cart-context'
 
 export default function CartPage() {
-  const [cartItems, setCartItems] = useState([
-    { id: 1, quantity: 1 },
-    { id: 3, quantity: 2 },
-  ])
+  const { cartItems, updateQuantity, removeFromCart } = useCart()
 
   const cartItemsWithProducts = cartItems
     .map((item) => {
       const product = PRODUCTS.find((p) => p.id === item.id)
       if (!product) return null
-
       const discountedPrice = product.price * (1 - product.discount / 100)
-
       return {
         ...item,
         product,
@@ -32,9 +27,7 @@ export default function CartPage() {
   const groupedCartItems = cartItemsWithProducts.reduce<Record<string, typeof cartItemsWithProducts>>(
     (groups, item) => {
       const category = item.product.category
-      if (!groups[category]) {
-        groups[category] = []
-      }
+      if (!groups[category]) groups[category] = []
       groups[category].push(item)
       return groups
     },
@@ -43,29 +36,7 @@ export default function CartPage() {
 
   const categoryOrder = Object.keys(groupedCartItems)
 
-  const handleQuantityChange = (productId: number, quantity: number) => {
-    if (quantity <= 0) {
-      setCartItems((prev) => prev.filter((item) => item.id !== productId))
-    } else {
-      setCartItems((prev) =>
-        prev.map((item) =>
-          item.id === productId ? { ...item, quantity } : item
-        )
-      )
-    }
-  }
-
-  const handleRemove = (productId: number) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== productId))
-  }
-
-  const subtotal = cartItems.reduce((total, item) => {
-    const product = PRODUCTS.find((p) => p.id === item.id)
-    if (!product) return total
-    const price = product.price * (1 - product.discount / 100)
-    return total + price * item.quantity
-  }, 0)
-
+  const subtotal = cartItemsWithProducts.reduce((total, item) => total + item.itemTotal, 0)
   const shipping = subtotal > 0 ? (subtotal > 5000000 ? 0 : 50000) : 0
   const total = subtotal + shipping
 
@@ -77,9 +48,7 @@ export default function CartPage() {
           <div className="text-center">
             <div className="text-6xl mb-4">🛒</div>
             <h1 className="mb-2 text-2xl font-bold">Giỏ hàng trống</h1>
-            <p className="text-muted-foreground mb-6">
-              Chưa có sản phẩm nào trong giỏ hàng
-            </p>
+            <p className="text-muted-foreground mb-6">Chưa có sản phẩm nào trong giỏ hàng</p>
             <Link
               href="/shop"
               className="inline-block rounded-lg bg-accent text-white px-6 py-3 font-medium transition-colors hover:bg-[rgb(15_110_86)]"
@@ -129,7 +98,6 @@ export default function CartPage() {
                       <div className="space-y-4">
                         {items.map((item) => {
                           const { product } = item
-
                           return (
                             <div
                               key={product.id}
@@ -161,7 +129,7 @@ export default function CartPage() {
                               {/* Quantity & Total */}
                               <div className="flex flex-col items-end justify-between">
                                 <button
-                                  onClick={() => handleRemove(product.id)}
+                                  onClick={() => removeFromCart(product.id)}
                                   className="text-destructive hover:bg-destructive/10 p-2 rounded transition-colors"
                                 >
                                   <Trash2 size={18} />
@@ -169,9 +137,7 @@ export default function CartPage() {
 
                                 <div className="flex items-center gap-2 border border-border rounded-lg">
                                   <button
-                                    onClick={() =>
-                                      handleQuantityChange(product.id, item.quantity - 1)
-                                    }
+                                    onClick={() => updateQuantity(product.id, item.quantity - 1)}
                                     className="p-1 hover:bg-neutral-100 transition-colors"
                                   >
                                     <Minus size={16} />
@@ -180,9 +146,7 @@ export default function CartPage() {
                                     {item.quantity}
                                   </span>
                                   <button
-                                    onClick={() =>
-                                      handleQuantityChange(product.id, item.quantity + 1)
-                                    }
+                                    onClick={() => updateQuantity(product.id, item.quantity + 1)}
                                     className="p-1 hover:bg-neutral-100 transition-colors"
                                   >
                                     <Plus size={16} />

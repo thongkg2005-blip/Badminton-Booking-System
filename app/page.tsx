@@ -12,8 +12,11 @@ export default function Home() {
       {/* Hero Section */}
       <section className="bg-primary text-white py-20 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl text-center">
-          <h1 className="mb-4 text-4xl font-bold sm:text-5xl text-balance">
-            Đặt sân cầu lông online — Nhanh, dễ, tiện
+          <h1 className="mb-4 text-white/80 font-bold sm:text-5xl text-balance">
+            Đặt sân cầu lông online
+          </h1>
+           <h1 className="mb-4 text-white/80 font-bold sm:text-5xl text-balance">
+           Nhanh, dễ, tiện
           </h1>
           <p className="mb-8 text-lg text-white/80">
             Chọn khung giờ, chọn sân, xác nhận trong 30 giây
@@ -26,10 +29,10 @@ export default function Home() {
               Đặt sân ngay
             </Link>
             <Link
-              href="#schedule"
+              href="/shop"
               className="inline-block rounded-lg border-2 border-white text-white px-8 py-3 font-medium transition-colors hover:bg-white/10"
             >
-              Xem lịch sân
+              Mua Sắm
             </Link>
           </div>
         </div>

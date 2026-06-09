@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { CartProvider } from '@/contexts/cart-context'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -36,7 +37,9 @@ export default function RootLayout({
   return (
     <html lang="vi" className="bg-background">
       <body className={`${inter.className} font-sans antialiased text-foreground`}>
-        {children}
+        <CartProvider>
+          {children}
+        </CartProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
