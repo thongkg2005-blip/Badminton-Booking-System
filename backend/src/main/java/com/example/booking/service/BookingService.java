@@ -34,6 +34,17 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
+    public List<Long> getOccupiedCourtIds(LocalDate date, LocalTime startTime, LocalTime endTime) {
+        if (date == null || startTime == null || endTime == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Date, start time and end time are required");
+        }
+        if (!endTime.isAfter(startTime)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End time must be after start time");
+        }
+        return bookingRepository.findOccupiedCourtIds(date, startTime, endTime);
+    }
+
+    @Transactional(readOnly = true)
     public List<Court> getAllCourts() {
         return courtRepository.findAll();
     }
@@ -59,7 +70,11 @@ public class BookingService {
         b.setNotes(notes);
         b.setStatus(BookingStatus.CONFIRMED);
 
-        return bookingRepository.save(b);
+        try {
+            return bookingRepository.saveAndFlush(b);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Selected slot is already booked");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -80,6 +95,20 @@ public class BookingService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking can only be cancelled at least 2 hours before start time");
         }
 
+        booking.setStatus(BookingStatus.CANCELLED);
+        return bookingRepository.save(booking);
+    }
+
+    /**
+     * Admin-only cancel: bypasses the 2-hour restriction so admins can
+     * cancel any booking regardless of how soon it starts.
+     */
+    @Transactional
+    public Booking adminCancelBooking(Long bookingId) {
+        Booking booking = getBooking(bookingId);
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            return booking;
+        }
         booking.setStatus(BookingStatus.CANCELLED);
         return bookingRepository.save(booking);
     }
@@ -111,6 +140,27 @@ public class BookingService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cancelled bookings cannot be confirmed");
         }
         booking.setStatus(BookingStatus.CONFIRMED);
+        return bookingRepository.save(booking);
+    }
+
+    @Transactional
+    public Booking updateBookingCourt(Long bookingId, Long newCourtId) {
+        Booking booking = getBooking(bookingId);
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot update court of a cancelled booking");
+        }
+        Court newCourt = courtRepository.findById(newCourtId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Court not found: " + newCourtId));
+
+        if (booking.getCourt().getId().equals(newCourtId)) {
+            return booking;
+        }
+
+        if (!isAvailable(newCourtId, booking.getBookingDate(), booking.getStartTime(), booking.getEndTime())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Selected court is not available for this time slot");
+        }
+
+        booking.setCourt(newCourt);
         return bookingRepository.save(booking);
     }
 

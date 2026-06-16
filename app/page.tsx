@@ -8,15 +8,15 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
-      
+
       {/* Hero Section */}
       <section className="bg-primary text-white py-20 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl text-center">
           <h1 className="mb-4 text-white/80 font-bold sm:text-5xl text-balance">
             Đặt sân cầu lông online
           </h1>
-           <h1 className="mb-4 text-white/80 font-bold sm:text-5xl text-balance">
-           Nhanh, dễ, tiện
+          <h1 className="mb-4 text-white/80 font-bold sm:text-5xl text-balance">
+            Nhanh, dễ, tiện
           </h1>
           <p className="mb-8 text-lg text-white/80">
             Chọn khung giờ, chọn sân, xác nhận trong 30 giây
@@ -60,7 +60,7 @@ export default function Home() {
             <div className="rounded-xl border border-border bg-card p-6 text-center">
               <div className="text-4xl font-bold text-accent mb-2">1</div>
               <p className="text-foreground font-medium">Chi nhánh</p>
-              <p className="text-sm text-muted-foreground">Tp. Hồ Chí Minh</p>
+              <p className="text-sm text-muted-foreground">Cần Thơ</p>
             </div>
           </div>
         </div>
@@ -72,7 +72,7 @@ export default function Home() {
           <h2 className="mb-12 text-center text-3xl font-bold text-foreground">
             Quy trình đặt sân
           </h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Step 1 */}
             <div className="flex flex-col items-center text-center">
@@ -115,7 +115,7 @@ export default function Home() {
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="mb-4 text-3xl font-bold">Bắt đầu ngay hôm nay</h2>
           <p className="mb-8 text-lg text-white/80">
-            Không cần dài dòng, chỉ cần 30 giây để đặt sân cầu lông yêu thích
+            Chỉ cần 30 giây đặt ngay sân cầu lông yêu thích.
           </p>
           <Link
             href="/booking"

@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { TIME_SLOTS, getPrice, getDayType } from '@/lib/booking-pricing'
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { TIME_SLOTS, getPrice, getDayType, getTimeRange } from '@/lib/booking-pricing'
 import { saveBookingDraft } from '@/lib/booking-storage'
+import { backendJson } from '@/lib/backend-api'
 
 const COURTS = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, name: `Sân ${i + 1}` }))
 
@@ -29,6 +30,11 @@ export default function BookingPage() {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<number | null>(null)
   const [selectedCourts, setSelectedCourts] = useState<number[]>([])
   const [currentMonth, setCurrentMonth] = useState(new Date())
+
+  // Availability state
+  const [occupiedCourtIds, setOccupiedCourtIds] = useState<number[]>([])
+  const [availabilityLoading, setAvailabilityLoading] = useState(false)
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null)
 
   const date = parseLocalDate(selectedDate)
   const dayType = getDayType(date)
@@ -59,6 +65,68 @@ export default function BookingPage() {
     return false
   }, [selectedDate])
 
+  const refreshOccupiedCourts = useCallback((showLoading = false) => {
+    if (selectedTimeSlot === null) {
+      setOccupiedCourtIds([])
+      setAvailabilityError(null)
+      return
+    }
+
+    const slotDef = TIME_SLOTS[selectedTimeSlot]
+    const { startTime, endTime } = getTimeRange(slotDef)
+
+    if (showLoading) {
+      setAvailabilityLoading(true)
+    }
+    setAvailabilityError(null)
+
+    backendJson<number[]>(
+      `/bookings/occupied?date=${selectedDate}&startTime=${startTime}&endTime=${endTime}`
+    )
+      .then((ids) => {
+        setOccupiedCourtIds(ids)
+        // Auto-deselect courts that are now occupied
+        setSelectedCourts((prev) => prev.filter((id) => !ids.includes(id)))
+      })
+      .catch(() => {
+        setAvailabilityError('Không thể kiểm tra trạng thái sân. Vui lòng thử lại.')
+        if (showLoading) {
+          setOccupiedCourtIds([])
+        }
+      })
+      .finally(() => {
+        if (showLoading) {
+          setAvailabilityLoading(false)
+        }
+      })
+  }, [selectedDate, selectedTimeSlot])
+
+  // Fetch occupied courts whenever date or time slot changes
+  useEffect(() => {
+    refreshOccupiedCourts(true)
+  }, [refreshOccupiedCourts])
+
+  // Keep court status fresh when admins cancel or block slots elsewhere
+  useEffect(() => {
+    if (selectedTimeSlot === null) return
+
+    const refreshIfVisible = () => {
+      if (!document.hidden) {
+        refreshOccupiedCourts()
+      }
+    }
+
+    const intervalId = window.setInterval(refreshIfVisible, 10000)
+    window.addEventListener('focus', refreshIfVisible)
+    document.addEventListener('visibilitychange', refreshIfVisible)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshIfVisible)
+      document.removeEventListener('visibilitychange', refreshIfVisible)
+    }
+  }, [refreshOccupiedCourts, selectedTimeSlot])
+
   useEffect(() => {
     if (selectedTimeSlot !== null && isSlotDisabled(selectedTimeSlot)) {
       setSelectedTimeSlot(null)
@@ -77,6 +145,8 @@ export default function BookingPage() {
 
   const days = Array.from({ length: getDaysInMonth(currentMonth) }, (_, i) => i + 1)
   const emptyDays = Array(getFirstDayOfMonth(currentMonth)).fill(null)
+
+  const availableCourtsCount = COURTS.length - occupiedCourtIds.length
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -176,25 +246,98 @@ export default function BookingPage() {
 
               {/* Step 3: Courts */}
               <div className="rounded-xl border border-border bg-card p-6">
-                <h2 className="mb-4 text-lg font-semibold">Bước 3: Chọn sân</h2>
+                <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
+                  <h2 className="text-lg font-semibold">Bước 3: Chọn sân</h2>
+
+                  {selectedTimeSlot !== null && (
+                    <div className="flex items-center gap-2 text-sm">
+                      {availabilityLoading ? (
+                        <span className="flex items-center gap-1 text-muted-foreground">
+                          <Loader2 size={14} className="animate-spin" />
+                          Đang kiểm tra...
+                        </span>
+                      ) : availabilityError ? (
+                        <span className="text-destructive text-xs">{availabilityError}</span>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          <span className="font-semibold text-accent">{availableCourtsCount}</span>
+                          /{COURTS.length} sân trống
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Legend */}
+                <div className="mb-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-[rgb(225_245_238)] border border-[rgb(15_110_86)]"></span>
+                    Đã chọn
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-red-50 border border-red-300"></span>
+                    Đã đặt
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-card border border-border"></span>
+                    Còn trống
+                  </span>
+                </div>
+
+                {selectedTimeSlot === null && (
+                  <p className="mb-4 text-sm text-muted-foreground italic">
+                    ← Vui lòng chọn khung giờ trước để xem trạng thái sân
+                  </p>
+                )}
+
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                  {COURTS.map((court) => (
-                    <button
-                      key={court.id}
-                      onClick={() => {
-                        setSelectedCourts((prev) =>
-                          prev.includes(court.id) ? prev.filter((c) => c !== court.id) : [...prev, court.id]
-                        )
-                      }}
-                      className={`rounded-lg border-2 p-4 text-center font-medium transition-colors ${
-                        selectedCourts.includes(court.id)
-                          ? 'border-accent bg-[rgb(225_245_238)] text-[rgb(15_110_86)]'
-                          : 'border-border hover:border-accent'
-                      }`}
-                    >
-                      {court.name}
-                    </button>
-                  ))}
+                  {COURTS.map((court) => {
+                    const isOccupied = occupiedCourtIds.includes(court.id)
+                    const isSelected = selectedCourts.includes(court.id)
+
+                    return (
+                      <button
+                        key={court.id}
+                        disabled={isOccupied || availabilityLoading}
+                        onClick={() => {
+                          if (isOccupied || availabilityLoading) return
+                          setSelectedCourts((prev) =>
+                            prev.includes(court.id)
+                              ? prev.filter((c) => c !== court.id)
+                              : [...prev, court.id]
+                          )
+                        }}
+                        className={`relative rounded-lg border-2 p-4 text-center font-medium transition-all ${
+                          isOccupied
+                            ? 'border-red-200 bg-red-50 text-red-400 cursor-not-allowed'
+                            : availabilityLoading
+                            ? 'border-border bg-neutral-50 text-muted-foreground cursor-wait opacity-70'
+                            : isSelected
+                            ? 'border-accent bg-[rgb(225_245_238)] text-[rgb(15_110_86)] shadow-sm'
+                            : 'border-border hover:border-accent hover:bg-accent/5'
+                        }`}
+                      >
+                        <span className="block text-base">{court.name}</span>
+                        <span className={`mt-1 block text-xs font-normal ${
+                          isOccupied
+                            ? 'text-red-400'
+                            : isSelected
+                            ? 'text-[rgb(15_110_86)]'
+                            : 'text-muted-foreground'
+                        }`}>
+                          {isOccupied
+                            ? '🔴 Đã đặt'
+                            : availabilityLoading
+                            ? '...'
+                            : isSelected
+                            ? '✓ Đã chọn'
+                            : selectedTimeSlot !== null
+                            ? '🟢 Còn trống'
+                            : ''}
+                        </span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             </div>

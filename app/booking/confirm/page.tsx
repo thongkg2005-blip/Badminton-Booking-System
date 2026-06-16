@@ -49,6 +49,34 @@ export default function BookingConfirmPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // 1. Validate fullName (cannot consist entirely of numbers)
+    const nameTrimmed = formData.fullName.trim()
+    if (/^\d+$/.test(nameTrimmed)) {
+      setError('Họ tên không hợp lệ (không được chỉ chứa chữ số).')
+      return
+    }
+    if (nameTrimmed.length < 2) {
+      setError('Họ tên phải có ít nhất 2 ký tự.')
+      return
+    }
+
+    // 2. Validate phone (exactly 10 digits starting with 0 for Vietnam)
+    const phoneClean = formData.phone.replace(/[\s\-\.\(\)]/g, '')
+    if (!/^0\d{9}$/.test(phoneClean)) {
+      setError('Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại gồm 10 chữ số (bắt đầu bằng số 0).')
+      return
+    }
+
+    // 3. Validate email (if provided)
+    if (formData.email && formData.email.trim() !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(formData.email.trim())) {
+        setError('Email không đúng định dạng.')
+        return
+      }
+    }
+
     setIsLoading(true)
     setError(null)
 
@@ -64,8 +92,8 @@ export default function BookingConfirmPage() {
             date: draft.date,
             startTime: `${String(slot.start).padStart(2, '0')}:00`,
             endTime: `${String(slot.end).padStart(2, '0')}:00`,
-            userName: formData.fullName,
-            userPhone: formData.phone || null,
+            userName: nameTrimmed,
+            userPhone: phoneClean,
             notes: formData.notes || null,
           }),
         })

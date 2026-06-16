@@ -36,6 +36,16 @@ public class BookingController {
         return ResponseEntity.ok().body(java.util.Map.of("available", ok));
     }
 
+    @GetMapping("/bookings/occupied")
+    public ResponseEntity<?> getOccupiedCourts(@RequestParam String date,
+                                               @RequestParam String startTime,
+                                               @RequestParam(required = false) String endTime) {
+        LocalDate d = LocalDate.parse(date);
+        LocalTime t = LocalTime.parse(startTime);
+        LocalTime et = endTime != null ? LocalTime.parse(endTime) : t.plusHours(2);
+        return ResponseEntity.ok(bookingService.getOccupiedCourtIds(d, t, et));
+    }
+
     public static class BookingRequest {
         public Long courtId;
         public String date;

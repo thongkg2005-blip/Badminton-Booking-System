@@ -40,7 +40,7 @@ public class AdminBookingController {
 
     @PostMapping("/bookings/{id}/cancel")
     public ResponseEntity<?> cancelBooking(@PathVariable Long id) {
-        Booking booking = bookingService.cancelBooking(id);
+        Booking booking = bookingService.adminCancelBooking(id);
         return ResponseEntity.ok(Map.of(
                 "id", booking.getId(),
                 "status", booking.getStatus().name()
@@ -73,6 +73,20 @@ public class AdminBookingController {
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "id", booking.getId(),
                 "status", booking.getStatus().name()
+        ));
+    }
+
+    @PutMapping("/bookings/{id}/court")
+    public ResponseEntity<?> updateBookingCourt(@PathVariable Long id, @RequestBody Map<String, Long> payload) {
+        if (payload == null || !payload.containsKey("courtId") || payload.get("courtId") == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "courtId is required");
+        }
+        Long newCourtId = payload.get("courtId");
+        Booking booking = bookingService.updateBookingCourt(id, newCourtId);
+        return ResponseEntity.ok(Map.of(
+                "id", booking.getId(),
+                "courtId", booking.getCourt().getId(),
+                "courtName", booking.getCourt().getName()
         ));
     }
 }

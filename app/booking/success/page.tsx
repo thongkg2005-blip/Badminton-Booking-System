@@ -21,8 +21,6 @@ export default function BookingSuccessPage() {
       return
     }
     setResult(r)
-    // Clear so the data doesn't persist after leaving this page
-    clearBookingResult()
   }, [router])
 
   if (!result) return null
@@ -87,12 +85,14 @@ export default function BookingSuccessPage() {
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/"
+                onClick={() => clearBookingResult()}
                 className="flex-1 rounded-lg border-2 border-border px-4 py-3 font-medium transition-colors hover:border-accent hover:text-accent"
               >
                 Về trang chủ
               </Link>
               <Link
                 href="/shop"
+                onClick={() => clearBookingResult()}
                 className="flex-1 rounded-lg bg-accent text-white px-4 py-3 font-medium transition-colors hover:bg-[rgb(15_110_86)]"
               >
                 Mua dụng cụ
