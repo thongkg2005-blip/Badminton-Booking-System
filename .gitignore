@@ -18,3 +18,5 @@ node_modules
 backend/target/
 backend/.mvn/
 backend/*.log
+
+/backend
