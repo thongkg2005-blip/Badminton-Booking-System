@@ -40,6 +40,10 @@ public class Product {
     @JoinColumn(name = "category_id")
     private ProductCategory category;
 
+    @ManyToOne(optional = false, fetch = FetchType.EAGER)
+    @JoinColumn(name = "branch_id")
+    private Branch branch;
+
     @Column(name = "created_at")
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -72,6 +76,9 @@ public class Product {
 
     public ProductCategory getCategory() { return category; }
     public void setCategory(ProductCategory category) { this.category = category; }
+
+    public Branch getBranch() { return branch; }
+    public void setBranch(Branch branch) { this.branch = branch; }
 
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }

@@ -50,7 +50,8 @@ public class BookingService {
     }
 
     @Transactional
-    public Booking createBooking(Long courtId, LocalDate date, LocalTime startTime, LocalTime endTime, String userName, String userPhone, String notes) {
+    public Booking createBooking(Long courtId, LocalDate date, LocalTime startTime, LocalTime endTime, String userName,
+            String userPhone, String notes) {
         validateBookingWindow(date, startTime, endTime);
 
         Court court = courtRepository.findById(courtId)
@@ -80,7 +81,8 @@ public class BookingService {
     @Transactional(readOnly = true)
     public Booking getBooking(Long bookingId) {
         return bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found: " + bookingId));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found: " + bookingId));
     }
 
     @Transactional
@@ -92,17 +94,14 @@ public class BookingService {
 
         LocalDateTime bookingStart = LocalDateTime.of(booking.getBookingDate(), booking.getStartTime());
         if (LocalDateTime.now().isAfter(bookingStart.minusHours(2))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking can only be cancelled at least 2 hours before start time");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Booking can only be cancelled at least 2 hours before start time");
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
         return bookingRepository.save(booking);
     }
 
-    /**
-     * Admin-only cancel: bypasses the 2-hour restriction so admins can
-     * cancel any booking regardless of how soon it starts.
-     */
     @Transactional
     public Booking adminCancelBooking(Long bookingId) {
         Booking booking = getBooking(bookingId);
@@ -111,6 +110,22 @@ public class BookingService {
         }
         booking.setStatus(BookingStatus.CANCELLED);
         return bookingRepository.save(booking);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Booking> getBookingsByPhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phone is required");
+        }
+
+        String normalizedPhone = phone.replaceAll("[\\s\\-\\.\\(\\)]", "");
+        return bookingRepository.findAll().stream()
+                .filter(booking -> booking.getUserPhone() != null)
+                .filter(booking -> normalizedPhone.equals(booking.getUserPhone().replaceAll("[\\s\\-\\.\\(\\)]", "")))
+                .sorted(Comparator
+                        .comparing(Booking::getBookingDate)
+                        .thenComparing(Booking::getStartTime))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -128,8 +143,8 @@ public class BookingService {
         }
 
         return stream.sorted(Comparator
-                        .comparing(Booking::getBookingDate)
-                        .thenComparing(Booking::getStartTime))
+                .comparing(Booking::getBookingDate)
+                .thenComparing(Booking::getStartTime))
                 .toList();
     }
 
@@ -149,10 +164,11 @@ public class BookingService {
         if (booking.getStatus() == BookingStatus.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot update court of a cancelled booking");
         }
+
         Court newCourt = courtRepository.findById(newCourtId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Court not found: " + newCourtId));
 
-        if (booking.getCourt().getId().equals(newCourtId)) {
+        if (booking.getCourt() != null && booking.getCourt().getId().equals(newCourtId)) {
             return booking;
         }
 
@@ -197,8 +213,7 @@ public class BookingService {
                 "total", (long) bookingRepository.count(),
                 "confirmed", counts.getOrDefault(BookingStatus.CONFIRMED, 0L),
                 "cancelled", counts.getOrDefault(BookingStatus.CANCELLED, 0L),
-                "blocked", counts.getOrDefault(BookingStatus.BLOCKED, 0L)
-        );
+                "blocked", counts.getOrDefault(BookingStatus.BLOCKED, 0L));
     }
 
     private void validateBookingWindow(LocalDate date, LocalTime startTime, LocalTime endTime) {
@@ -211,7 +226,8 @@ public class BookingService {
 
         LocalDateTime bookingStart = LocalDateTime.of(date, startTime);
         if (bookingStart.isBefore(LocalDateTime.now().plusHours(1))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bookings must be made at least 1 hour in advance");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Bookings must be made at least 1 hour in advance");
         }
     }
 }

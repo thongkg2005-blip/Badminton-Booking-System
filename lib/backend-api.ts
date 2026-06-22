@@ -6,10 +6,13 @@ export function backendUrl(path: string) {
 }
 
 export async function backendJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+
   const response = await fetch(backendUrl(path), {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
   })

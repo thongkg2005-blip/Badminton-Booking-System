@@ -1,22 +1,63 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
 import { Lock } from 'lucide-react'
+import { useCart } from '@/contexts/cart-context'
+import { useProducts } from '@/hooks/use-products'
+import { createOrder } from '@/lib/order-api'
+import {
+  formatPrice,
+  getDiscountedPrice,
+} from '@/lib/product-api'
+import {
+  calculateOrderTotal,
+  calculateShipping,
+} from '@/lib/cart-pricing'
 
 export default function CheckoutPage() {
   const router = useRouter()
+  const { cartItems, clearCart } = useCart()
+  const { products, loading, error } = useProducts()
   const [isProcessing, setIsProcessing] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
+    customerName: '',
     cardName: '',
     cardNumber: '',
     expiryDate: '',
     cvv: '',
     email: '',
   })
+
+  useEffect(() => {
+    if (!loading && cartItems.length === 0) {
+      router.replace('/cart')
+    }
+  }, [cartItems.length, loading, router])
+
+  const cartLines = useMemo(() => {
+    return cartItems
+      .map((item) => {
+        const product = products.find((p) => p.id === item.id)
+        if (!product) return null
+        const unitPrice = getDiscountedPrice(product)
+        return {
+          product,
+          quantity: item.quantity,
+          unitPrice,
+          lineTotal: unitPrice * item.quantity,
+        }
+      })
+      .filter((line): line is NonNullable<typeof line> => line !== null)
+  }, [cartItems, products])
+
+  const subtotal = cartLines.reduce((total, line) => total + line.lineTotal, 0)
+  const shipping = calculateShipping(subtotal)
+  const total = calculateOrderTotal(subtotal)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -25,24 +66,68 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitError(null)
+
+    const customerName = formData.customerName.trim()
+    if (customerName.length < 2) {
+      setSubmitError('Vui lòng nhập họ tên hợp lệ.')
+      return
+    }
+
+    if (cartLines.length === 0) {
+      setSubmitError('Giỏ hàng không còn sản phẩm hợp lệ.')
+      return
+    }
+
     setIsProcessing(true)
 
-    // Simulate payment processing
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    
-    // In real implementation, this would call a Stripe API endpoint
-    router.push('/payment/success')
-    setIsProcessing(false)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1200))
+
+      const order = await createOrder(
+        customerName,
+        cartLines.map((line) => ({
+          productId: line.product.id,
+          quantity: line.quantity,
+        })),
+      )
+
+      clearCart()
+      router.push(`/payment/success?orderId=${order.id}&shipping=${shipping}`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Không thể hoàn tất thanh toán'
+      setSubmitError(message)
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
-  const cartItems = [
-    { name: 'Vợt cầu lông Yonex', price: 2500000, qty: 1 },
-    { name: 'Giày cầu lông Li Ning', price: 1200000, qty: 2 },
-  ]
+  if (loading) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center py-12 px-4">
+          <p className="text-muted-foreground">Đang tải thông tin thanh toán...</p>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
 
-  const subtotal = cartItems.reduce((total, item) => total + item.price * item.qty, 0)
-  const shipping = 50000
-  const total = subtotal + shipping
+  if (error) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center py-12 px-4">
+          <div className="text-center">
+            <p className="font-medium text-destructive">Không thể tải thông tin sản phẩm</p>
+            <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -53,24 +138,32 @@ export default function CheckoutPage() {
           <h1 className="mb-8 text-3xl font-bold">Thanh toán</h1>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Payment Form */}
             <div className="lg:col-span-2">
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Contact Email */}
                 <div className="rounded-xl border border-border bg-card p-6">
-                  <h2 className="mb-4 text-lg font-semibold">Thông tin liên hệ</h2>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    placeholder="email@example.com"
-                    className="w-full rounded-lg border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
+                  <h2 className="mb-4 text-lg font-semibold">Thông tin người nhận</h2>
+                  <div className="space-y-4">
+                    <input
+                      type="text"
+                      name="customerName"
+                      value={formData.customerName}
+                      onChange={handleChange}
+                      required
+                      placeholder="Họ và tên"
+                      className="w-full rounded-lg border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      required
+                      placeholder="email@example.com"
+                      className="w-full rounded-lg border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
                 </div>
 
-                {/* Card Information */}
                 <div className="rounded-xl border border-border bg-card p-6">
                   <div className="flex items-center gap-2 mb-4">
                     <Lock size={20} className="text-accent" />
@@ -78,7 +171,6 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="space-y-4">
-                    {/* Card Preview */}
                     <div className="rounded-lg bg-gradient-to-br from-primary to-secondary text-white p-6 mb-6">
                       <p className="text-sm opacity-75 mb-4">Số thẻ</p>
                       <p className="font-mono text-xl tracking-widest mb-8">
@@ -93,18 +185,13 @@ export default function CheckoutPage() {
                         </div>
                         <div>
                           <p className="text-xs opacity-75">HSD</p>
-                          <p className="text-sm font-mono">
-                            {formData.expiryDate || 'MM/YY'}
-                          </p>
+                          <p className="text-sm font-mono">{formData.expiryDate || 'MM/YY'}</p>
                         </div>
                       </div>
                     </div>
 
-                    {/* Card Name */}
                     <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Tên chủ thẻ
-                      </label>
+                      <label className="block text-sm font-medium mb-2">Tên chủ thẻ</label>
                       <input
                         type="text"
                         name="cardName"
@@ -116,11 +203,8 @@ export default function CheckoutPage() {
                       />
                     </div>
 
-                    {/* Card Number */}
                     <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Số thẻ
-                      </label>
+                      <label className="block text-sm font-medium mb-2">Số thẻ</label>
                       <input
                         type="text"
                         name="cardNumber"
@@ -139,12 +223,9 @@ export default function CheckoutPage() {
                       />
                     </div>
 
-                    {/* Expiry & CVV */}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Hạn sử dụng
-                        </label>
+                        <label className="block text-sm font-medium mb-2">Hạn sử dụng</label>
                         <input
                           type="text"
                           name="expiryDate"
@@ -154,10 +235,7 @@ export default function CheckoutPage() {
                             if (value.length >= 2) {
                               value = value.slice(0, 2) + '/' + value.slice(2)
                             }
-                            setFormData((prev) => ({
-                              ...prev,
-                              expiryDate: value,
-                            }))
+                            setFormData((prev) => ({ ...prev, expiryDate: value }))
                           }}
                           required
                           placeholder="MM/YY"
@@ -185,37 +263,41 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Submit Button */}
+                {submitError && (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                    {submitError}
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  disabled={isProcessing}
+                  disabled={isProcessing || cartLines.length === 0}
                   className="w-full rounded-lg bg-accent text-white py-3 font-medium transition-colors hover:bg-[rgb(15_110_86)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isProcessing ? 'Đang xử lý thanh toán...' : 'Thanh toán ngay'}
                 </button>
 
-                {/* Security Note */}
                 <p className="text-xs text-muted-foreground text-center">
-                  🔒 Thanh toán của bạn được bảo mật bằng Stripe. Chúng tôi không lưu thông tin thẻ.
+                  Thanh toán thẻ hiện được mô phỏng cho demo. Đơn hàng thật sẽ được lưu và trừ tồn kho sau khi xác nhận.
                 </p>
               </form>
             </div>
 
-            {/* Order Summary */}
             <div className="lg:col-span-1">
               <div className="sticky top-24 rounded-xl border border-border bg-card p-6">
                 <h3 className="mb-6 text-lg font-semibold">Tóm tắt đơn hàng</h3>
 
                 <div className="mb-6 space-y-3 max-h-64 overflow-y-auto">
-                  {cartItems.map((item, i) => (
-                    <div key={i} className="flex justify-between text-sm pb-3 border-b border-border">
+                  {cartLines.map((line) => (
+                    <div
+                      key={line.product.id}
+                      className="flex justify-between text-sm pb-3 border-b border-border"
+                    >
                       <div>
-                        <p className="font-medium">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">x{item.qty}</p>
+                        <p className="font-medium">{line.product.name}</p>
+                        <p className="text-xs text-muted-foreground">x{line.quantity}</p>
                       </div>
-                      <p className="font-medium">
-                        {(item.price * item.qty).toLocaleString()} đ
-                      </p>
+                      <p className="font-medium">{formatPrice(line.lineTotal)}</p>
                     </div>
                   ))}
                 </div>
@@ -223,17 +305,19 @@ export default function CheckoutPage() {
                 <div className="space-y-2 text-sm mb-6 pb-6 border-b border-border">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Tạm tính</span>
-                    <span className="font-medium">{subtotal.toLocaleString()} đ</span>
+                    <span className="font-medium">{formatPrice(subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Vận chuyển</span>
-                    <span className="font-medium">{shipping.toLocaleString()} đ</span>
+                    <span className="font-medium">
+                      {shipping === 0 ? 'Miễn phí' : formatPrice(shipping)}
+                    </span>
                   </div>
                 </div>
 
                 <div className="flex justify-between text-lg font-bold">
                   <span>Tổng cộng</span>
-                  <span className="text-accent">{total.toLocaleString()} đ</span>
+                  <span className="text-accent">{formatPrice(total)}</span>
                 </div>
 
                 <Link

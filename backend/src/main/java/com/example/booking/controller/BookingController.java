@@ -77,6 +77,11 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getBooking(id));
     }
 
+    @GetMapping("/bookings/my")
+    public ResponseEntity<?> getMyBookings(@RequestParam String phone) {
+        return ResponseEntity.ok(bookingService.getBookingsByPhone(phone));
+    }
+
     @DeleteMapping("/bookings/{id}")
     public ResponseEntity<?> cancelBooking(@PathVariable Long id) {
         Booking booking = bookingService.cancelBooking(id);

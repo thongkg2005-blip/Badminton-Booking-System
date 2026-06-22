@@ -1,8 +1,18 @@
-import PRODUCTS from '@/lib/products'
+const BACKEND_ORIGIN = process.env.BACKEND_URL ?? 'http://localhost:8080/api'
 
 export async function GET() {
-  return new Response(JSON.stringify(PRODUCTS), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  })
+  try {
+    const response = await fetch(`${BACKEND_ORIGIN}/products`, { cache: 'no-store' })
+    const body = await response.text()
+
+    return new Response(body, {
+      status: response.status,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  } catch {
+    return new Response(JSON.stringify({ error: 'Backend unavailable' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
 }

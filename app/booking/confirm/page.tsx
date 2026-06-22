@@ -7,6 +7,7 @@ import Footer from '@/components/footer'
 import { TIME_SLOTS, getPrice, getDayType, formatCurrency } from '@/lib/booking-pricing'
 import { loadBookingDraft, saveBookingResult, clearBookingDraft } from '@/lib/booking-storage'
 import { backendJson } from '@/lib/backend-api'
+import { Lock } from 'lucide-react'
 
 export default function BookingConfirmPage() {
   const router = useRouter()
@@ -16,6 +17,7 @@ export default function BookingConfirmPage() {
     email: '',
     notes: '',
   })
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -25,6 +27,24 @@ export default function BookingConfirmPage() {
   useEffect(() => {
     if (!loadBookingDraft()) {
       router.replace('/booking')
+      return
+    }
+
+    // Auto-fill from logged-in user
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      try {
+        const u = JSON.parse(storedUser)
+        setIsLoggedIn(true)
+        setFormData((prev) => ({
+          ...prev,
+          fullName: u.fullName || '',
+          phone: u.phone || '',
+          email: u.email || '',
+        }))
+      } catch {
+        // ignore parse errors
+      }
     }
   }, [router])
 
@@ -117,6 +137,10 @@ export default function BookingConfirmPage() {
     }
   }
 
+  // Input classes
+  const readOnlyClass = 'w-full rounded-lg border border-border px-4 py-2 bg-muted text-muted-foreground cursor-not-allowed'
+  const editableClass = 'w-full rounded-lg border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent'
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
@@ -134,14 +158,24 @@ export default function BookingConfirmPage() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Auto-fill notice banner */}
+              {isLoggedIn && (
+                <div className="mb-4 flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm text-accent">
+                  <Lock size={14} className="shrink-0" />
+                  Thông tin cá nhân được tự động điền từ tài khoản của bạn.
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-6" noValidate>
                 <div className="rounded-xl border border-border bg-card p-6">
                   <h2 className="mb-4 text-lg font-semibold">Thông tin cá nhân</h2>
 
                   <div className="space-y-4">
+                    {/* Full Name */}
                     <div>
-                      <label htmlFor="fullName" className="block text-sm font-medium mb-2">
+                      <label htmlFor="fullName" className="mb-2 flex items-center gap-1.5 text-sm font-medium">
                         Họ tên <span className="text-destructive">*</span>
+                        {isLoggedIn && <Lock size={12} className="text-muted-foreground" />}
                       </label>
                       <input
                         type="text"
@@ -149,15 +183,17 @@ export default function BookingConfirmPage() {
                         name="fullName"
                         value={formData.fullName}
                         onChange={handleChange}
-                        required
+                        readOnly={isLoggedIn}
                         placeholder="Nhập họ tên của bạn"
-                        className="w-full rounded-lg border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                        className={isLoggedIn ? readOnlyClass : editableClass}
                       />
                     </div>
 
+                    {/* Phone */}
                     <div>
-                      <label htmlFor="phone" className="block text-sm font-medium mb-2">
+                      <label htmlFor="phone" className="mb-2 flex items-center gap-1.5 text-sm font-medium">
                         Số điện thoại <span className="text-destructive">*</span>
+                        {isLoggedIn && <Lock size={12} className="text-muted-foreground" />}
                       </label>
                       <input
                         type="tel"
@@ -165,15 +201,17 @@ export default function BookingConfirmPage() {
                         name="phone"
                         value={formData.phone}
                         onChange={handleChange}
-                        required
+                        readOnly={isLoggedIn}
                         placeholder="0912 345 678"
-                        className="w-full rounded-lg border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                        className={isLoggedIn ? readOnlyClass : editableClass}
                       />
                     </div>
 
+                    {/* Email */}
                     <div>
-                      <label htmlFor="email" className="block text-sm font-medium mb-2">
+                      <label htmlFor="email" className="mb-2 flex items-center gap-1.5 text-sm font-medium">
                         Email
+                        {isLoggedIn && <Lock size={12} className="text-muted-foreground" />}
                       </label>
                       <input
                         type="email"
@@ -181,11 +219,13 @@ export default function BookingConfirmPage() {
                         name="email"
                         value={formData.email}
                         onChange={handleChange}
+                        readOnly={isLoggedIn}
                         placeholder="email@example.com"
-                        className="w-full rounded-lg border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                        className={isLoggedIn ? readOnlyClass : editableClass}
                       />
                     </div>
 
+                    {/* Notes - always editable */}
                     <div>
                       <label htmlFor="notes" className="block text-sm font-medium mb-2">
                         Ghi chú

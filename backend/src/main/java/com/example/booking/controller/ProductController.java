@@ -2,8 +2,10 @@ package com.example.booking.controller;
 
 import com.example.booking.model.Product;
 import com.example.booking.model.ProductCategory;
+import com.example.booking.model.Branch;
 import com.example.booking.repository.ProductCategoryRepository;
 import com.example.booking.repository.ProductRepository;
+import com.example.booking.repository.BranchRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,11 +20,14 @@ public class ProductController {
 
     private final ProductRepository productRepository;
     private final ProductCategoryRepository categoryRepository;
+    private final BranchRepository branchRepository;
 
     public ProductController(ProductRepository productRepository,
-                             ProductCategoryRepository categoryRepository) {
+                             ProductCategoryRepository categoryRepository,
+                             BranchRepository branchRepository) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.branchRepository = branchRepository;
     }
 
     /** GET /api/products — list all products (optional ?category=name filter) */
@@ -30,7 +35,7 @@ public class ProductController {
     public ResponseEntity<List<Product>> getProducts(
             @RequestParam(required = false) String category) {
         List<Product> products = (category != null && !category.isBlank())
-                ? productRepository.findByCategoryName(category)
+                ? productRepository.findByCategory_Name(category)
                 : productRepository.findAll();
         return ResponseEntity.ok(products);
     }
@@ -65,6 +70,7 @@ public class ProductController {
         product.setStock(req.stock != null ? req.stock : 0);
         product.setDescription(req.description);
         product.setCategory(category);
+        product.setBranch(resolveBranch(req.branchId));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(productRepository.save(product));
     }
@@ -88,6 +94,9 @@ public class ProductController {
             ProductCategory cat = categoryRepository.findById(req.categoryId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category not found"));
             product.setCategory(cat);
+        }
+        if (req.branchId != null) {
+            product.setBranch(resolveBranch(req.branchId));
         }
 
         return ResponseEntity.ok(productRepository.save(product));
@@ -114,5 +123,15 @@ public class ProductController {
         public Integer stock;
         public String description;
         public Long categoryId;
+        public Long branchId;
+    }
+
+    private Branch resolveBranch(Long branchId) {
+        if (branchId != null) {
+            return branchRepository.findById(branchId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Branch not found"));
+        }
+        return branchRepository.findAll().stream().findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No branch configured"));
     }
 }

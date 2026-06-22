@@ -10,9 +10,9 @@ export type CartItem = {
 type CartContextType = {
   cartItems: CartItem[]
   cartCount: number
-  addToCart: (productId: number) => void
+  addToCart: (productId: number, maxStock?: number) => void
   removeFromCart: (productId: number) => void
-  updateQuantity: (productId: number, quantity: number) => void
+  updateQuantity: (productId: number, quantity: number, maxStock?: number) => void
   clearCart: () => void
 }
 
@@ -43,12 +43,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems))
   }, [cartItems, hydrated])
 
-  const addToCart = useCallback((productId: number) => {
+  const addToCart = useCallback((productId: number, maxStock?: number) => {
     setCartItems((prev) => {
       const existing = prev.find((item) => item.id === productId)
       if (existing) {
+        const nextQuantity = existing.quantity + 1
+        const cappedQuantity = maxStock != null ? Math.min(nextQuantity, maxStock) : nextQuantity
         return prev.map((item) =>
-          item.id === productId ? { ...item, quantity: item.quantity + 1 } : item
+          item.id === productId ? { ...item, quantity: cappedQuantity } : item
         )
       }
       return [...prev, { id: productId, quantity: 1 }]
@@ -59,16 +61,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setCartItems((prev) => prev.filter((item) => item.id !== productId))
   }, [])
 
-  const updateQuantity = useCallback((productId: number, quantity: number) => {
+  const updateQuantity = useCallback((productId: number, quantity: number, maxStock?: number) => {
     if (quantity <= 0) {
       setCartItems((prev) => prev.filter((item) => item.id !== productId))
-    } else {
-      setCartItems((prev) =>
-        prev.map((item) =>
-          item.id === productId ? { ...item, quantity } : item
-        )
-      )
+      return
     }
+
+    const cappedQuantity = maxStock != null ? Math.min(quantity, maxStock) : quantity
+    setCartItems((prev) =>
+      prev.map((item) =>
+        item.id === productId ? { ...item, quantity: cappedQuantity } : item
+      )
+    )
   }, [])
 
   const clearCart = useCallback(() => {

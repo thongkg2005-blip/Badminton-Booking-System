@@ -34,9 +34,11 @@ export default function AdminPage() {
     blockedSlots: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
+    setError(null)
     Promise.all([
       backendJson<Booking[]>('/admin/bookings'),
       backendJson<{ total: number; confirmed: number; cancelled: number; blocked: number }>('/admin/bookings/stats')
@@ -65,6 +67,7 @@ export default function AdminPage() {
       })
       .catch((err) => {
         console.error('Error fetching admin statistics:', err)
+        setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu trang quản trị.')
       })
       .finally(() => setLoading(false))
   }, [])
@@ -147,6 +150,14 @@ export default function AdminPage() {
             <h1 className="text-3xl font-bold mb-2">Bảng điều khiển quản lý</h1>
             <p className="text-muted-foreground">Quản lý sân cầu lông, giá, và đơn đặt sân</p>
           </div>
+
+          {error && (
+            <div className="mb-6 rounded-lg border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+              {error.includes('401') || error.includes('403')
+                ? 'Bạn cần đăng nhập để xem dữ liệu quản trị.'
+                : error}
+            </div>
+          )}
 
           {/* Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

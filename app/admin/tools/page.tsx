@@ -5,13 +5,8 @@ import Link from 'next/link'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
 
-type Product = {
-  id: number
-  name: string
-  category: string
-  brand: string
-  price: number
-}
+import { normalizeProduct, formatPrice } from '@/lib/product-api'
+import type { Product } from '@/lib/product-api'
 
 export default function AdminToolsPage() {
   const [items, setItems] = useState<Product[]>([])
@@ -19,7 +14,7 @@ export default function AdminToolsPage() {
   useEffect(() => {
     fetch('/api/products')
       .then((r) => r.json())
-      .then(setItems)
+      .then((data) => setItems(Array.isArray(data) ? data.map(normalizeProduct) : []))
       .catch(() => setItems([]))
   }, [])
 
@@ -38,10 +33,10 @@ export default function AdminToolsPage() {
               <div key={p.id} className="rounded border p-4 bg-card flex justify-between">
                 <div>
                   <div className="font-semibold">{p.name}</div>
-                  <div className="text-sm text-muted-foreground">{p.brand} · {p.category}</div>
+                  <div className="text-sm text-muted-foreground">{p.brand} · {p.category.name}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-medium">{p.price.toLocaleString()} đ</div>
+                  <div className="font-medium">{formatPrice(p.price)}</div>
                   <Link href={`/admin/tools/${p.id}/edit`} className="text-sm text-accent mt-2 block">Sửa</Link>
                 </div>
               </div>

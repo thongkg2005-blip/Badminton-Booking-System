@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
-import { TIME_SLOTS, getPrice, getDayType, getTimeRange } from '@/lib/booking-pricing'
+import { TIME_SLOTS, getDayType, getTimeRange } from '@/lib/booking-pricing'
 import { saveBookingDraft } from '@/lib/booking-storage'
 import { backendJson } from '@/lib/backend-api'
+import { type CourtPrice, fetchCourtPrices, getCourtPriceValue } from '@/lib/court-prices'
 
 const COURTS = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, name: `Sân ${i + 1}` }))
 
@@ -35,11 +36,12 @@ export default function BookingPage() {
   const [occupiedCourtIds, setOccupiedCourtIds] = useState<number[]>([])
   const [availabilityLoading, setAvailabilityLoading] = useState(false)
   const [availabilityError, setAvailabilityError] = useState<string | null>(null)
+  const [courtPrices, setCourtPrices] = useState<CourtPrice[]>([])
 
   const date = parseLocalDate(selectedDate)
   const dayType = getDayType(date)
   const slot = selectedTimeSlot !== null ? TIME_SLOTS[selectedTimeSlot] : null
-  const pricePerCourt = slot ? getPrice(slot, dayType) : 0
+  const pricePerCourt = slot ? getCourtPriceValue(courtPrices, slot, dayType) : 0
   const totalPrice = pricePerCourt * selectedCourts.length
 
   const getDaysInMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
@@ -105,6 +107,12 @@ export default function BookingPage() {
   useEffect(() => {
     refreshOccupiedCourts(true)
   }, [refreshOccupiedCourts])
+
+  useEffect(() => {
+    fetchCourtPrices()
+      .then(setCourtPrices)
+      .catch(() => setCourtPrices([]))
+  }, [])
 
   // Keep court status fresh when admins cancel or block slots elsewhere
   useEffect(() => {
