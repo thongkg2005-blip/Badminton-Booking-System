@@ -53,6 +53,7 @@ public class BookingController {
         public String endTime;
         public String userName;
         public String userPhone;
+        public Long userId;
         public String notes;
     }
 
@@ -65,7 +66,7 @@ public class BookingController {
         LocalDate d = LocalDate.parse(req.date);
         LocalTime st = LocalTime.parse(req.startTime);
         LocalTime et = LocalTime.parse(req.endTime);
-        Booking b = bookingService.createBooking(req.courtId, d, st, et, req.userName, req.userPhone, req.notes);
+        Booking b = bookingService.createBooking(req.courtId, d, st, et, req.userName, req.userPhone, req.notes, req.userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(java.util.Map.of(
                 "id", b.getId(),
                 "status", b.getStatus().name()
@@ -78,7 +79,11 @@ public class BookingController {
     }
 
     @GetMapping("/bookings/my")
-    public ResponseEntity<?> getMyBookings(@RequestParam String phone) {
+    public ResponseEntity<?> getMyBookings(@RequestParam(required = false) Long userId,
+                                           @RequestParam(required = false) String phone) {
+        if (userId != null) {
+            return ResponseEntity.ok(bookingService.getBookingsByUserId(userId));
+        }
         return ResponseEntity.ok(bookingService.getBookingsByPhone(phone));
     }
 

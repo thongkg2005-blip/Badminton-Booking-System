@@ -5,6 +5,7 @@ import com.example.booking.model.BookingStatus;
 import com.example.booking.model.Court;
 import com.example.booking.repository.BookingRepository;
 import com.example.booking.repository.CourtRepository;
+import com.example.booking.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,10 +24,12 @@ import java.util.stream.Collectors;
 public class BookingService {
     private final BookingRepository bookingRepository;
     private final CourtRepository courtRepository;
+    private final UserRepository userRepository;
 
-    public BookingService(BookingRepository bookingRepository, CourtRepository courtRepository) {
+    public BookingService(BookingRepository bookingRepository, CourtRepository courtRepository, UserRepository userRepository) {
         this.bookingRepository = bookingRepository;
         this.courtRepository = courtRepository;
+        this.userRepository = userRepository;
     }
 
     public boolean isAvailable(Long courtId, LocalDate date, LocalTime startTime, LocalTime endTime) {
@@ -51,7 +54,7 @@ public class BookingService {
 
     @Transactional
     public Booking createBooking(Long courtId, LocalDate date, LocalTime startTime, LocalTime endTime, String userName,
-            String userPhone, String notes) {
+            String userPhone, String notes, Long userId) {
         validateBookingWindow(date, startTime, endTime);
 
         Court court = courtRepository.findById(courtId)
@@ -70,6 +73,10 @@ public class BookingService {
         b.setUserPhone(userPhone);
         b.setNotes(notes);
         b.setStatus(BookingStatus.CONFIRMED);
+        if (userId != null) {
+            b.setUser(userRepository.findById(userId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId)));
+        }
 
         try {
             return bookingRepository.saveAndFlush(b);
@@ -126,6 +133,17 @@ public class BookingService {
                         .comparing(Booking::getBookingDate)
                         .thenComparing(Booking::getStartTime))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Booking> getBookingsByUserId(Long userId) {
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User id is required");
+        }
+        if (!userRepository.existsById(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId);
+        }
+        return bookingRepository.findByUserIdOrderByBookingDateDescStartTimeDesc(userId);
     }
 
     @Transactional(readOnly = true)

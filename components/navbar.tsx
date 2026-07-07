@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Menu, X } from 'lucide-react'
-
+import Image from 'next/image'
 type User = {
   id: number
   username: string
@@ -57,9 +57,15 @@ export default function Navbar() {
             href="/"
             className="flex items-center gap-2 font-medium transition-opacity hover:opacity-80"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded bg-white text-primary">
-              🏸
-            </div>
+          <div className="h-10 w-10 overflow-hidden rounded-full">
+              <Image
+                  src="/logo_NLCSN.png"
+                  alt="Logo"
+                  width={32}
+                  height={32}
+                  className="h-full w-full object-cover"
+                />       
+                     </div>
             <span className="hidden sm:inline">Sân Cầu Lông</span>
           </Link>
 

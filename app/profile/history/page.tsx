@@ -75,17 +75,17 @@ export default function BookingHistoryPage() {
 
     try {
       const u = JSON.parse(storedUser)
-      const phone = u.phone
+      const userId = u.id
 
-      if (!phone) {
-        setError('Tài khoản của bạn chưa có số điện thoại. Vui lòng cập nhật thông tin cá nhân.')
+      if (!userId) {
+        setError('Không tìm thấy mã tài khoản. Vui lòng đăng nhập lại.')
         setIsLoading(false)
         return
       }
 
-      setUserPhone(phone)
+      setUserPhone(u.phone ?? null)
 
-      fetch(`/backend-api/bookings/my?phone=${encodeURIComponent(phone)}`)
+      fetch(`/backend-api/bookings/my?userId=${encodeURIComponent(String(userId))}`)
         .then((res) => {
           if (!res.ok) throw new Error('Không thể tải lịch sử đặt sân')
           return res.json()

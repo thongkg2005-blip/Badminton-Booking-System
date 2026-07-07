@@ -12,6 +12,8 @@ import java.util.List;
 public interface BookingRepository extends JpaRepository<Booking, Long> {
   boolean existsByCourtIdAndBookingDateAndStartTime(Long courtId, LocalDate bookingDate, LocalTime startTime);
 
+  List<Booking> findByUserIdOrderByBookingDateDescStartTimeDesc(Long userId);
+
   @Query("""
       select case when count(b) > 0 then true else false end
       from Booking b

@@ -1,5 +1,6 @@
 package com.example.booking.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -17,6 +18,11 @@ public class Booking {
     @ManyToOne(optional = false)
     @JoinColumn(name = "court_id")
     private Court court;
+
+    @JsonIgnore
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "user_id")
+    private User user;
 
     @Column(name = "booking_date", nullable = false)
     private LocalDate bookingDate;
@@ -55,6 +61,14 @@ public class Booking {
 
     public void setCourt(Court court) {
         this.court = court;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 
     public LocalDate getBookingDate() {
