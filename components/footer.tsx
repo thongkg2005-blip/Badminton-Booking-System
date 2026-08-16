@@ -33,11 +33,7 @@ export default function Footer() {
                   Cửa hàng
                 </Link>
               </li>
-              <li>
-                <Link href="/admin" className="text-white/80 transition-colors hover:text-white">
-                  Quản lý
-                </Link>
-              </li>
+           
             </ul>
           </div>
 

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
+import { saveTokenToStorage, saveUserToStorage } from '@/lib/auth-api'
 
 type Notice = {
   type: 'success' | 'error'
@@ -19,10 +20,20 @@ const emptyForm = {
   phone: '',
 }
 
+function normalizePhone(phone: string) {
+  let normalized = phone.replace(/[\s\-\.\(\)]/g, '')
+  if (normalized.startsWith('+84')) {
+    normalized = '0' + normalized.slice(3)
+  } else if (normalized.startsWith('84') && normalized.length === 11) {
+    normalized = '0' + normalized.slice(2)
+  }
+  return normalized
+}
+
 function validateRegister(formData: typeof emptyForm) {
   const fullName = formData.fullName.trim()
   const email = formData.email.trim()
-  const phone = formData.phone.replace(/[\s\-\.\(\)]/g, '')
+  const phone = normalizePhone(formData.phone)
 
   if (fullName.split(/\s+/).filter(Boolean).length < 2) {
     return 'Họ tên phải có ít nhất 2 từ'
@@ -84,7 +95,7 @@ export default function AuthPage() {
       const username = formData.username.trim()
       const fullName = formData.fullName.trim()
       const email = formData.email.trim()
-      const phone = formData.phone.replace(/[\s\-\.\(\)]/g, '')
+      const phone = normalizePhone(formData.phone)
 
       if (!isLogin) {
         const validationMessage = validateRegister(formData)
@@ -109,24 +120,28 @@ export default function AuthPage() {
               username,
               password: formData.password,
               email,
-              phone,
+              phone: normalizePhone(formData.phone),
             },
         ),
       })
 
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response))
+        const errorMessage = await readErrorMessage(response)
+        if (isLogin && (response.status === 401 || errorMessage.toLowerCase().includes('unauthorized'))) {
+          throw new Error('Đăng nhập thất bại')
+        }
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
 
       if (isLogin) {
         if (data?.token) {
-          localStorage.setItem('token', data.token)
+          saveTokenToStorage(data.token)
 
           // Save user information too
           if (data?.user) {
-            localStorage.setItem('user', JSON.stringify(data.user))
+            saveUserToStorage(data.user)
           }
         }
 
@@ -143,7 +158,9 @@ export default function AuthPage() {
     } catch (err) {
       setNotice({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Đăng nhập/đăng ký thất bại',
+        message: err instanceof Error
+          ? err.message
+          : (isLogin ? 'Đăng nhập thất bại' : 'Đăng ký thất bại'),
       })
     } finally {
       setIsLoading(false)

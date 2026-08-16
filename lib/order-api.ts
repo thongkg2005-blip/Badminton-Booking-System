@@ -13,7 +13,14 @@ export type OrderItem = {
 export type Order = {
   id: number
   customerName: string
+  customerEmail: string
+  customerPhone: string
+  shippingAddress: string
   totalAmount: number
+  shippingAmount: number
+  paymentMethod: 'ONLINE' | 'COD' | string
+  paymentStatus: 'PAID' | 'PENDING' | string
+  orderStatus: 'PENDING' | 'CONFIRMED' | 'SHIPPING' | 'COMPLETED' | string
   purchaseDate: string
   items: OrderItem[]
 }
@@ -40,7 +47,14 @@ export function normalizeOrder(raw: Record<string, unknown>): Order {
   return {
     id: toNumber(raw.id),
     customerName: String(raw.customerName ?? ''),
+    customerEmail: String(raw.customerEmail ?? ''),
+    customerPhone: String(raw.customerPhone ?? ''),
+    shippingAddress: String(raw.shippingAddress ?? ''),
     totalAmount: toNumber(raw.totalAmount),
+    shippingAmount: toNumber(raw.shippingAmount),
+    paymentMethod: String(raw.paymentMethod ?? 'ONLINE'),
+    paymentStatus: String(raw.paymentStatus ?? 'PAID'),
+    orderStatus: String(raw.orderStatus ?? 'PENDING'),
     purchaseDate: String(raw.purchaseDate ?? ''),
     items: items.map((item) => normalizeOrderItem(item as Record<string, unknown>)),
   }
@@ -51,19 +65,44 @@ export type CreateOrderItem = {
   quantity: number
 }
 
+export type CreateOrderInput = {
+  customerName: string
+  customerEmail: string
+  customerPhone: string
+  shippingAddress: string
+  paymentMethod: 'ONLINE' | 'COD'
+  items: CreateOrderItem[]
+}
+
 export async function createOrder(
-  customerName: string,
-  items: CreateOrderItem[],
-): Promise<Order> {
+  input: CreateOrderInput): Promise<Order> {
   const data = await backendJson<Record<string, unknown>>('/orders', {
     method: 'POST',
-    body: JSON.stringify({ customerName, items }),
+    body: JSON.stringify(input),
   })
   return normalizeOrder(data)
 }
 
 export async function fetchOrder(orderId: number): Promise<Order> {
   const data = await backendJson<Record<string, unknown>>(`/orders/${orderId}`)
+  return normalizeOrder(data)
+}
+
+export async function fetchMyOrders(): Promise<Order[]> {
+  const data = await backendJson<Record<string, unknown>[]>(`/orders/my`)
+  return data.map((item) => normalizeOrder(item))
+}
+
+export async function fetchAdminOrders(): Promise<Order[]> {
+  const data = await backendJson<Record<string, unknown>[]>(`/admin/orders`)
+  return data.map((item) => normalizeOrder(item))
+}
+
+export async function updateAdminOrderStatus(orderId: number, status: Order['orderStatus']): Promise<Order> {
+  const data = await backendJson<Record<string, unknown>>(`/admin/orders/${orderId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
   return normalizeOrder(data)
 }
 

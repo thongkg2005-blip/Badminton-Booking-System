@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react'
+import { AUTH_SESSION_CHANGED_EVENT } from '@/lib/auth-api'
 
 export type CartItem = {
   id: number
@@ -18,30 +19,79 @@ type CartContextType = {
 
 const CartContext = createContext<CartContextType | null>(null)
 
-const CART_STORAGE_KEY = 'badminton_cart'
+const CART_STORAGE_BASE = 'badminton_cart'
+
+function getCartStorageKey() {
+  if (typeof window === 'undefined') {
+    return CART_STORAGE_BASE
+  }
+
+  const rawUser = localStorage.getItem('user')
+  if (!rawUser) {
+    return `${CART_STORAGE_BASE}_guest`
+  }
+
+  try {
+    const parsedUser = JSON.parse(rawUser) as { id?: number }
+    if (parsedUser?.id != null) {
+      return `${CART_STORAGE_BASE}_user_${parsedUser.id}`
+    }
+  } catch {
+    // ignore parse errors
+  }
+
+  return `${CART_STORAGE_BASE}_guest`
+}
+
+function loadCartFromStorage(key: string): CartItem[] {
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  const raw = localStorage.getItem(key)
+  if (!raw) return []
+
+  try {
+    return JSON.parse(raw) as CartItem[]
+  } catch {
+    return []
+  }
+}
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [hydrated, setHydrated] = useState(false)
+  const storageKeyRef = useRef<string>(CART_STORAGE_BASE)
 
-  // Load from localStorage on mount
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(CART_STORAGE_KEY)
-      if (raw) {
-        setCartItems(JSON.parse(raw) as CartItem[])
-      }
-    } catch {
-      // ignore parse errors
-    }
+    const key = getCartStorageKey()
+    storageKeyRef.current = key
+    setCartItems(loadCartFromStorage(key))
     setHydrated(true)
   }, [])
 
-  // Persist to localStorage whenever cart changes (after hydration)
   useEffect(() => {
     if (!hydrated) return
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems))
+    localStorage.setItem(storageKeyRef.current, JSON.stringify(cartItems))
   }, [cartItems, hydrated])
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const nextKey = getCartStorageKey()
+      if (nextKey === storageKeyRef.current) return
+
+      storageKeyRef.current = nextKey
+      setCartItems(loadCartFromStorage(nextKey))
+    }
+
+    window.addEventListener(AUTH_SESSION_CHANGED_EVENT, handleAuthChange)
+    window.addEventListener('storage', handleAuthChange)
+
+    return () => {
+      window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, handleAuthChange)
+      window.removeEventListener('storage', handleAuthChange)
+    }
+  }, [])
 
   const addToCart = useCallback((productId: number, maxStock?: number) => {
     setCartItems((prev) => {

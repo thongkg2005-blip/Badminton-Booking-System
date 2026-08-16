@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import Image from 'next/image'
+import { removeAuthSession } from '@/lib/auth-api'
 type User = {
   id: number
   username: string
@@ -39,9 +40,7 @@ export default function Navbar() {
   const isAdmin = user?.role?.toUpperCase() === 'ADMIN'
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-
+    removeAuthSession()
     setUser(null)
 
     // Refresh page after logout
@@ -126,6 +125,20 @@ export default function Navbar() {
                       className="block px-4 py-2 text-sm hover:bg-neutral-100 transition-colors"
                     >
                       Lịch sử đặt sân
+                    </Link>
+                    <Link
+                      href="/profile/orders"
+                      onClick={() => setShowDropdown(false)}
+                      className="block px-4 py-2 text-sm hover:bg-neutral-100 transition-colors"
+                    >
+                      Đơn đặt hàng
+                    </Link>
+                    <Link
+                      href="/profile/password"
+                      onClick={() => setShowDropdown(false)}
+                      className="block px-4 py-2 text-sm hover:bg-neutral-100 transition-colors"
+                    >
+                      Đổi mật khẩu
                     </Link>
                     {isAdmin && (
                       <Link
@@ -216,6 +229,22 @@ export default function Navbar() {
                     className="text-sm text-white/90 hover:text-accent py-1"
                   >
                     Lịch sử đặt sân
+                  </Link>
+
+                  <Link
+                    href="/profile/orders"
+                    onClick={() => setIsOpen(false)}
+                    className="text-sm text-white/90 hover:text-accent py-1"
+                  >
+                    Đơn đặt hàng
+                  </Link>
+
+                  <Link
+                    href="/profile/password"
+                    onClick={() => setIsOpen(false)}
+                    className="text-sm text-white/90 hover:text-accent py-1"
+                  >
+                    Đổi mật khẩu
                   </Link>
 
                   {isAdmin && (

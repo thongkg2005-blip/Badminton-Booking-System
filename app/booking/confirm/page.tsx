@@ -7,6 +7,7 @@ import Footer from '@/components/footer'
 import { TIME_SLOTS, getPrice, getDayType, formatCurrency } from '@/lib/booking-pricing'
 import { loadBookingDraft, saveBookingResult, clearBookingDraft } from '@/lib/booking-storage'
 import { backendJson } from '@/lib/backend-api'
+import { removeAuthSession } from '@/lib/auth-api'
 import { Lock } from 'lucide-react'
 
 export default function BookingConfirmPage() {

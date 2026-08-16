@@ -9,6 +9,13 @@ import { TIME_SLOTS, getDayType, getPrice, formatCurrency, COURTS } from '@/lib/
 import { backendJson } from '@/lib/backend-api'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 
+type Court = {
+  id: number
+  name: string
+  code: string
+  maintenance: boolean
+}
+
 type Booking = {
   id: number
   court: {
@@ -37,8 +44,11 @@ export default function AdminBookingsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [bookings, setBookings] = useState<Booking[]>([])
   const [stats, setStats] = useState({ total: 0, confirmed: 0, cancelled: 0, blocked: 0 })
+  const [courts, setCourts] = useState<Court[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [courtUpdateError, setCourtUpdateError] = useState<string | null>(null)
+  const [updatingCourtMaintenanceId, setUpdatingCourtMaintenanceId] = useState<number | null>(null)
 
   // Edit Court Modal State
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
@@ -49,11 +59,16 @@ export default function AdminBookingsPage() {
   const fetchBookingsAndStats = useCallback(async () => {
     try {
       setLoading(true)
-      const data = await backendJson<Booking[]>('/admin/bookings')
-      const statsData = await backendJson<{ total: number; confirmed: number; cancelled: number; blocked: number }>('/admin/bookings/stats')
+      const [data, statsData, courtsData] = await Promise.all([
+        backendJson<Booking[]>('/admin/bookings'),
+        backendJson<{ total: number; confirmed: number; cancelled: number; blocked: number }>('/admin/bookings/stats'),
+        backendJson<Court[]>('/courts'),
+      ])
       setBookings(data)
       setStats(statsData)
+      setCourts(courtsData)
       setError(null)
+      setCourtUpdateError(null)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Không thể tải danh sách đặt sân.')
     } finally {
@@ -120,6 +135,22 @@ export default function AdminBookingsPage() {
     }
   }
 
+  const handleToggleMaintenance = async (courtId: number, maintenance: boolean) => {
+    try {
+      setUpdatingCourtMaintenanceId(courtId)
+      setCourtUpdateError(null)
+      await backendJson(`/admin/courts/${courtId}/maintenance`, {
+        method: 'PUT',
+        body: JSON.stringify({ maintenance }),
+      })
+      await fetchBookingsAndStats()
+    } catch (err: unknown) {
+      setCourtUpdateError(err instanceof Error ? err.message : 'Cập nhật trạng thái bảo trì thất bại')
+    } finally {
+      setUpdatingCourtMaintenanceId(null)
+    }
+  }
+
   const filteredBookings = bookings.filter((booking) => {
     const matchesStatus = !statusFilter || booking.status === statusFilter
     const matchesSearch =
@@ -175,29 +206,77 @@ export default function AdminBookingsPage() {
             </div>
           </div>
 
-          {/* Filter & Search */}
-          <div className="mb-6 flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search size={18} className="absolute left-3 top-3 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Tìm theo tên khách hàng hoặc mã hoá đơn..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-border bg-white pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              />
+          {/* Filter, Search & Court Maintenance */}
+          <div className="mb-6 grid gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1">
+                <Search size={18} className="absolute left-3 top-3 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên khách hàng hoặc mã hoá đơn..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-white pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+
+              <select
+                value={statusFilter || ''}
+                onChange={(e) => setStatusFilter(e.target.value || null)}
+                className="rounded-lg border border-border bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                <option value="">Tất cả trạng thái</option>
+                <option value="CONFIRMED">Đã xác nhận</option>
+                <option value="CANCELLED">Đã hủy</option>
+              </select>
             </div>
 
-            <select
-              value={statusFilter || ''}
-              onChange={(e) => setStatusFilter(e.target.value || null)}
-              className="rounded-lg border border-border bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-            >
-              <option value="">Tất cả trạng thái</option>
-              <option value="CONFIRMED">Đã xác nhận</option>
-              <option value="CANCELLED">Đã hủy</option>
-              <option value="BLOCKED">Đã khóa</option>
-            </select>
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-semibold">Trạng thái sân</h3>
+                  <p className="text-sm text-muted-foreground">Cập nhật bảo trì để khoá sân không cho đặt.</p>
+                </div>
+                {courtUpdateError && (
+                  <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive">
+                    {courtUpdateError}
+                  </div>
+                )}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {courts.map((court) => (
+                  <div key={court.id} className="rounded-xl border border-border bg-white p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold">{court.name}</p>
+                        <p className="text-xs text-muted-foreground">{court.code}</p>
+                      </div>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${court.maintenance ? 'bg-yellow-100 text-yellow-800' : 'bg-emerald-100 text-emerald-800'}`}
+                      >
+                        {court.maintenance ? 'Đang bảo trì' : 'Khả dụng'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleToggleMaintenance(court.id, !court.maintenance)}
+                      disabled={loading || updatingCourtMaintenanceId === court.id}
+                      className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {updatingCourtMaintenanceId === court.id ? (
+                        <>
+                          <Loader2 className="animate-spin" size={16} />
+                          Đang cập nhật...
+                        </>
+                      ) : court.maintenance ? (
+                        'Chuyển sang Khả dụng'
+                      ) : (
+                        'Đặt chế độ bảo trì'
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           {error && (

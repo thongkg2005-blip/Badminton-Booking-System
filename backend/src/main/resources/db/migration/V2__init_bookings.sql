@@ -1,6 +1,6 @@
 -- V2: Create bookings table
 
-CREATE TABLE bookings (
+CREATE TABLE IF NOT EXISTS bookings (
     id           BIGSERIAL    PRIMARY KEY,
     court_id     BIGINT       NOT NULL REFERENCES courts(id),
     booking_date DATE         NOT NULL,

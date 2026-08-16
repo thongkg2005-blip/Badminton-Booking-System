@@ -13,6 +13,9 @@ public class Court {
     private String name;
     private String code;
 
+    @Column(name = "is_maintenance", nullable = false)
+    private boolean isMaintenance = false;
+
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
     public Long getId() { return id; }
@@ -21,6 +24,8 @@ public class Court {
     public void setName(String name) { this.name = name; }
     public String getCode() { return code; }
     public void setCode(String code) { this.code = code; }
+    public boolean isMaintenance() { return isMaintenance; }
+    public void setMaintenance(boolean maintenance) { isMaintenance = maintenance; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
 }

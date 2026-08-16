@@ -64,3 +64,66 @@ export async function fetchProducts(category?: string): Promise<Product[]> {
 export async function fetchProductCategories(): Promise<ProductCategory[]> {
   return backendJson<ProductCategory[]>('/product-categories')
 }
+
+export async function createCategory(name: string): Promise<ProductCategory> {
+  return backendJson<ProductCategory>('/product-categories', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function updateCategory(id: number, name: string): Promise<ProductCategory> {
+  return backendJson<ProductCategory>(`/product-categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function deleteCategory(id: number): Promise<void> {
+  await backendJson<{ deleted: boolean }>(`/product-categories/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export type ProductInput = {
+  name: string
+  brand: string
+  price: number
+  discount: number
+  image: string
+  rating?: number
+  stock: number
+  description?: string
+  categoryId: number
+  branchId?: number
+}
+
+export async function createProduct(input: ProductInput): Promise<Product> {
+  const data = await backendJson<Record<string, unknown>>('/products', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return normalizeProduct(data)
+}
+
+export async function updateProduct(id: number, input: Partial<ProductInput>): Promise<Product> {
+  const data = await backendJson<Record<string, unknown>>(`/products/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+  return normalizeProduct(data)
+}
+
+export async function deleteProduct(id: number): Promise<void> {
+  try {
+    await backendJson<{ deleted: boolean }>(`/products/${id}`, {
+      method: 'DELETE',
+    })
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Conflict') {
+      throw new Error('Không thể xóa sản phẩm này vì sản phẩm đã có trong lịch sử đơn hàng')
+    }
+    throw err
+  }
+}
+

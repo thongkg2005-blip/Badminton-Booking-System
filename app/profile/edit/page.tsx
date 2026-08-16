@@ -2,44 +2,64 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ChevronLeft, AlertCircle, CheckCircle } from 'lucide-react'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
+import {
+  fetchProfile,
+  requireAuthSession,
+  removeAuthSession,
+  saveUserToStorage,
+  updateProfile,
+  validateFullName,
+} from '@/lib/auth-api'
 
 export default function EditProfilePage() {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
   })
-
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
+  const [isPageLoading, setIsPageLoading] = useState(true)
   const [successMessage, setSuccessMessage] = useState('')
 
-  // Load from localStorage on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('user')
-    if (storedUser) {
-      try {
-        const u = JSON.parse(storedUser)
-        setFormData({
-          name: u.fullName || '',
-          email: u.email || '',
-          phone: u.phone || '',
-        })
-      } catch (err) {
-        console.error('Failed to parse user profile', err)
-      }
+    const session = requireAuthSession()
+    if (!session) {
+      router.replace('/auth')
+      return
     }
-  }, [])
 
-  // Validation
+    fetchProfile()
+      .then((user) => {
+        saveUserToStorage(user)
+        setFormData({
+          name: user.fullName || '',
+          email: user.email || '',
+          phone: user.phone || '',
+        })
+      })
+      .catch((err: Error) => {
+        if (err.message.toLowerCase().includes('unauthorized')) {
+          removeAuthSession()
+          router.replace('/auth')
+          return
+        }
+        setErrors({ submit: err.message || 'Không thể tải thông tin tài khoản' })
+      })
+      .finally(() => setIsPageLoading(false))
+  }, [router])
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Họ tên không được để trống'
+    const nameError = validateFullName(formData.name)
+    if (nameError) {
+      newErrors.name = nameError
     }
 
     if (!formData.email.trim()) {
@@ -58,23 +78,20 @@ export default function EditProfilePage() {
     return Object.keys(newErrors).length === 0
   }
 
-  // Handle input change
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }))
-    // Clear error for this field when user starts typing
     if (errors[name]) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
         [name]: '',
       }))
     }
   }
 
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -82,41 +99,53 @@ export default function EditProfilePage() {
       return
     }
 
+    if (!requireAuthSession()) {
+      router.replace('/auth')
+      return
+    }
+
     setIsLoading(true)
     setSuccessMessage('')
 
     try {
-      // Update localStorage user info
-      const storedUser = localStorage.getItem('user')
-      if (storedUser) {
-        const u = JSON.parse(storedUser)
-        const updated = {
-          ...u,
-          fullName: formData.name.trim(),
-          email: formData.email.trim(),
-          phone: formData.phone.replace(/[\s\-\.\(\)]/g, ''),
-        }
-        localStorage.setItem('user', JSON.stringify(updated))
-      }
+      const user = await updateProfile({
+        fullName: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.replace(/[\s\-\.\(\)]/g, ''),
+      })
 
-      // Simulated API delay
-      await new Promise(resolve => setTimeout(resolve, 800))
-
+      saveUserToStorage(user)
       setSuccessMessage('Cập nhật thông tin thành công!')
 
-      // Redirect to profile page after 1.5 seconds
       setTimeout(() => {
-        window.location.href = '/profile'
+        router.push('/profile')
       }, 1500)
     } catch (error) {
-      console.error('[v0] Error updating profile:', error)
-      setErrors(prev => ({
+      const message = error instanceof Error ? error.message : 'Có lỗi xảy ra. Vui lòng thử lại.'
+      if (message.toLowerCase().includes('unauthorized')) {
+        removeAuthSession()
+        router.replace('/auth')
+        return
+      }
+      setErrors((prev) => ({
         ...prev,
-        submit: 'Có lỗi xảy ra. Vui lòng thử lại.',
+        submit: message,
       }))
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (isPageLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="mx-auto max-w-2xl px-4 py-8 text-center text-muted-foreground">
+          Đang tải thông tin...
+        </main>
+        <Footer />
+      </div>
+    )
   }
 
   return (
@@ -124,7 +153,6 @@ export default function EditProfilePage() {
       <Navbar />
 
       <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="mb-8 flex items-center gap-4">
           <Link
             href="/profile"
@@ -135,7 +163,6 @@ export default function EditProfilePage() {
           <h1 className="text-3xl font-bold text-foreground">Chỉnh sửa thông tin</h1>
         </div>
 
-        {/* Success Message */}
         {successMessage && (
           <div className="mb-6 flex items-center gap-3 rounded-lg bg-[rgb(225,245,238)] p-4">
             <CheckCircle size={20} className="text-accent" />
@@ -143,7 +170,6 @@ export default function EditProfilePage() {
           </div>
         )}
 
-        {/* Error Message */}
         {errors.submit && (
           <div className="mb-6 flex items-center gap-3 rounded-lg bg-[rgb(252,235,235)] p-4">
             <AlertCircle size={20} className="text-destructive" />
@@ -151,9 +177,7 @@ export default function EditProfilePage() {
           </div>
         )}
 
-        {/* Edit Form */}
         <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-card p-6 sm:p-8">
-          {/* Name Field */}
           <div className="mb-6">
             <label htmlFor="name" className="block text-sm font-medium text-foreground">
               Họ tên
@@ -172,7 +196,6 @@ export default function EditProfilePage() {
             {errors.name && <p className="mt-1 text-xs text-destructive">{errors.name}</p>}
           </div>
 
-          {/* Email Field */}
           <div className="mb-6">
             <label htmlFor="email" className="block text-sm font-medium text-foreground">
               Email
@@ -191,7 +214,6 @@ export default function EditProfilePage() {
             {errors.email && <p className="mt-1 text-xs text-destructive">{errors.email}</p>}
           </div>
 
-          {/* Phone Field */}
           <div className="mb-8">
             <label htmlFor="phone" className="block text-sm font-medium text-foreground">
               Số điện thoại
@@ -210,7 +232,6 @@ export default function EditProfilePage() {
             {errors.phone && <p className="mt-1 text-xs text-destructive">{errors.phone}</p>}
           </div>
 
-          {/* Action Buttons */}
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               type="submit"
@@ -228,13 +249,13 @@ export default function EditProfilePage() {
           </div>
         </form>
 
-        {/* Info Box */}
         <div className="mt-8 rounded-lg bg-muted/30 p-6">
           <h3 className="mb-2 font-medium text-foreground">Lưu ý</h3>
           <ul className="space-y-2 text-sm text-muted-foreground">
+            <li>• Họ tên phải có ít nhất 2 chữ cái</li>
             <li>• Số điện thoại phải bắt đầu bằng 0 và có 10 chữ số</li>
             <li>• Email phải là định dạng hợp lệ (ví dụ: user@example.com)</li>
-            <li>• Tất cả các thông tin đều bắt buộc phải cập nhật</li>
+            <li>• Thông tin sẽ được lưu vào tài khoản của bạn sau khi xác nhận</li>
           </ul>
         </div>
       </main>

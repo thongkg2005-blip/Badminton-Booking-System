@@ -5,6 +5,7 @@ import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
 import { Trash2, Plus, Minus } from 'lucide-react'
 import { useCart } from '@/contexts/cart-context'
+import { ProductImage } from '@/components/product-image'
 import { useProducts } from '@/hooks/use-products'
 import {
   formatPrice,
@@ -145,8 +146,13 @@ export default function CartPage() {
                               key={product.id}
                               className="rounded-xl border border-border bg-card p-4 flex gap-4"
                             >
-                              <div className="flex h-24 w-24 items-center justify-center rounded bg-neutral-100 flex-shrink-0">
-                                <span className="text-4xl">{product.image}</span>
+                              <div className="flex h-24 w-24 items-center justify-center rounded bg-neutral-100 flex-shrink-0 overflow-hidden">
+                                <ProductImage
+                                  image={product.image}
+                                  alt={product.name}
+                                  className="h-full w-full object-cover"
+                                  fallbackSizeClass="text-4xl"
+                                />
                               </div>
 
                               <div className="flex-1 min-w-0">

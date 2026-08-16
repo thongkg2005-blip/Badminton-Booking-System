@@ -7,6 +7,7 @@ import Footer from '@/components/footer'
 import { ShoppingCart, Star } from 'lucide-react'
 import { useCart } from '@/contexts/cart-context'
 import { useProducts } from '@/hooks/use-products'
+import { ProductImage } from '@/components/product-image'
 import {
   formatPrice,
   getCategoryName,
@@ -136,8 +137,13 @@ export default function ShopPage() {
                           key={product.id}
                           className="flex h-full min-h-[440px] flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-accent"
                         >
-                          <div className="flex aspect-[4/3] items-center justify-center bg-neutral-100">
-                            <span className="text-7xl leading-none">{product.image}</span>
+                          <div className="flex aspect-[4/3] items-center justify-center bg-neutral-100 overflow-hidden">
+                            <ProductImage
+                              image={product.image}
+                              alt={product.name}
+                              className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                              fallbackSizeClass="text-7xl leading-none"
+                            />
                           </div>
 
                           <div className="flex flex-1 flex-col p-4">

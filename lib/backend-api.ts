@@ -18,7 +18,14 @@ export async function backendJson<T>(path: string, init?: RequestInit): Promise<
   })
 
   if (!response.ok) {
-    const message = await response.text()
+    const raw = await response.text()
+    let message = raw
+    try {
+      const parsed = JSON.parse(raw) as { message?: string; error?: string }
+      message = parsed.message || parsed.error || raw
+    } catch {
+      message = raw
+    }
     throw new Error(message || `Request failed with status ${response.status}`)
   }
 

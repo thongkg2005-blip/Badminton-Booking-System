@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Calendar, Clock, MapPin, Phone, FileText, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { ChevronLeft, Calendar, Clock, MapPin, FileText, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
+import { backendJson } from '@/lib/backend-api'
+import { requireAuthSession, removeAuthSession } from '@/lib/auth-api'
 
 type BookingStatus = 'CONFIRMED' | 'CANCELLED' | 'BLOCKED'
 
@@ -64,43 +66,30 @@ export default function BookingHistoryPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [userPhone, setUserPhone] = useState<string | null>(null)
+  const [userName, setUserName] = useState<string | null>(null)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user')
-    if (!storedUser) {
+    const session = requireAuthSession()
+    if (!session) {
       router.replace('/auth')
       return
     }
 
-    try {
-      const u = JSON.parse(storedUser)
-      const userId = u.id
+    setUserName(session.user.fullName ?? null)
 
-      if (!userId) {
-        setError('Không tìm thấy mã tài khoản. Vui lòng đăng nhập lại.')
-        setIsLoading(false)
-        return
-      }
-
-      setUserPhone(u.phone ?? null)
-
-      fetch(`/backend-api/bookings/my?userId=${encodeURIComponent(String(userId))}`)
-        .then((res) => {
-          if (!res.ok) throw new Error('Không thể tải lịch sử đặt sân')
-          return res.json()
-        })
-        .then((data: Booking[]) => {
-          setBookings(data)
-        })
-        .catch((err: Error) => {
-          setError(err.message || 'Có lỗi xảy ra')
-        })
-        .finally(() => setIsLoading(false))
-    } catch {
-      localStorage.removeItem('user')
-      router.replace('/auth')
-    }
+    backendJson<Booking[]>('/bookings/my')
+      .then((data) => {
+        setBookings(data)
+      })
+      .catch((err: Error) => {
+        if (err.message.toLowerCase().includes('unauthorized')) {
+          removeAuthSession()
+          router.replace('/auth')
+          return
+        }
+        setError(err.message || 'Có lỗi xảy ra')
+      })
+      .finally(() => setIsLoading(false))
   }, [router])
 
   return (
@@ -118,10 +107,9 @@ export default function BookingHistoryPage() {
           </Link>
           <div>
             <h1 className="text-3xl font-bold text-foreground">Lịch sử đặt sân</h1>
-            {userPhone && (
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Phone size={14} />
-                {userPhone}
+            {userName && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Tài khoản: {userName}
               </p>
             )}
           </div>

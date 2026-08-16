@@ -6,6 +6,7 @@ import com.example.booking.model.Branch;
 import com.example.booking.repository.ProductCategoryRepository;
 import com.example.booking.repository.ProductRepository;
 import com.example.booking.repository.BranchRepository;
+import com.example.booking.repository.OrderItemRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,13 +22,16 @@ public class ProductController {
     private final ProductRepository productRepository;
     private final ProductCategoryRepository categoryRepository;
     private final BranchRepository branchRepository;
+    private final OrderItemRepository orderItemRepository;
 
     public ProductController(ProductRepository productRepository,
                              ProductCategoryRepository categoryRepository,
-                             BranchRepository branchRepository) {
+                             BranchRepository branchRepository,
+                             OrderItemRepository orderItemRepository) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.branchRepository = branchRepository;
+        this.orderItemRepository = orderItemRepository;
     }
 
     /** GET /api/products — list all products (optional ?category=name filter) */
@@ -52,6 +56,50 @@ public class ProductController {
     @GetMapping("/product-categories")
     public ResponseEntity<List<ProductCategory>> getCategories() {
         return ResponseEntity.ok(categoryRepository.findAll());
+    }
+
+    /** POST /api/product-categories — create a new category (admin) */
+    @PostMapping("/product-categories")
+    public ResponseEntity<ProductCategory> createCategory(@RequestBody CategoryRequest req) {
+        if (req == null || req.name == null || req.name.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category name is required");
+        }
+        String name = req.name.trim();
+        if (categoryRepository.findByName(name).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category with this name already exists");
+        }
+        ProductCategory category = new ProductCategory();
+        category.setName(name);
+        return ResponseEntity.status(HttpStatus.CREATED).body(categoryRepository.save(category));
+    }
+
+    /** PUT /api/product-categories/{id} — update category name (admin) */
+    @PutMapping("/product-categories/{id}")
+    public ResponseEntity<ProductCategory> updateCategory(@PathVariable Long id, @RequestBody CategoryRequest req) {
+        ProductCategory category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
+        if (req != null && req.name != null && !req.name.isBlank()) {
+            String name = req.name.trim();
+            categoryRepository.findByName(name).ifPresent(existing -> {
+                if (!existing.getId().equals(id)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Another category already uses this name");
+                }
+            });
+            category.setName(name);
+        }
+        return ResponseEntity.ok(categoryRepository.save(category));
+    }
+
+    /** DELETE /api/product-categories/{id} — delete a category (admin) */
+    @DeleteMapping("/product-categories/{id}")
+    public ResponseEntity<Map<String, Object>> deleteCategory(@PathVariable Long id) {
+        ProductCategory category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
+        if (productRepository.existsByCategoryId(id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot delete category containing products");
+        }
+        categoryRepository.delete(category);
+        return ResponseEntity.ok(Map.of("deleted", true, "id", id));
     }
 
     /** POST /api/products — create a new product (admin) */
@@ -108,6 +156,12 @@ public class ProductController {
         if (!productRepository.existsById(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
+        if (orderItemRepository.existsByProductId(id)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "message", "Không thể xóa sản phẩm này vì sản phẩm đã có trong lịch sử đơn hàng",
+                    "id", id
+            ));
+        }
         productRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("deleted", true, "id", id));
     }
@@ -124,6 +178,10 @@ public class ProductController {
         public String description;
         public Long categoryId;
         public Long branchId;
+    }
+
+    public static class CategoryRequest {
+        public String name;
     }
 
     private Branch resolveBranch(Long branchId) {

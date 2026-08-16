@@ -24,7 +24,7 @@ public class Product {
     @Column(nullable = false)
     private Integer discount = 0;
 
-    @Column(nullable = false, length = 10)
+    @Column(columnDefinition = "TEXT")
     private String image = "🏸";
 
     @Column(precision = 3, scale = 1)

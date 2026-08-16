@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, Mail, Phone, User } from 'lucide-react'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
+import { fetchProfile, requireAuthSession, removeAuthSession, saveUserToStorage } from '@/lib/auth-api'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -16,27 +17,64 @@ export default function ProfilePage() {
     phone: string
     role: string
   } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user')
-    if (!storedUser) {
+    const session = requireAuthSession()
+    if (!session) {
       router.replace('/auth')
       return
     }
-    try {
-      const u = JSON.parse(storedUser)
-      setUserInfo({
-        id: String(u.id),
-        name: u.fullName,
-        email: u.email || 'Chưa cập nhật',
-        phone: u.phone || 'Chưa cập nhật',
-        role: u.role === 'ADMIN' ? 'Quản trị viên' : 'Khách hàng',
+
+    fetchProfile()
+      .then((user) => {
+        saveUserToStorage(user)
+        setUserInfo({
+          id: String(user.id),
+          name: user.fullName,
+          email: user.email || 'Chưa cập nhật',
+          phone: user.phone || 'Chưa cập nhật',
+          role: user.role === 'ADMIN' ? 'Quản trị viên' : 'Khách hàng',
+        })
       })
-    } catch {
-      localStorage.removeItem('user')
-      router.replace('/auth')
-    }
+      .catch((err: Error) => {
+        if (err.message.toLowerCase().includes('unauthorized')) {
+          removeAuthSession()
+          router.replace('/auth')
+          return
+        }
+        const message = err.message.toLowerCase().includes('not found')
+          ? 'Không thể tải thông tin tài khoản. Hãy đảm bảo backend đang chạy và thử đăng nhập lại.'
+          : (err.message || 'Không thể tải thông tin tài khoản')
+        setError(message)
+      })
+      .finally(() => setIsLoading(false))
   }, [router])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="mx-auto max-w-2xl px-4 py-8 text-center text-muted-foreground">
+          Đang tải thông tin...
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="mx-auto max-w-2xl px-4 py-8 text-center text-destructive">
+          {error}
+        </main>
+        <Footer />
+      </div>
+    )
+  }
 
   if (!userInfo) return null
 
@@ -45,7 +83,6 @@ export default function ProfilePage() {
       <Navbar />
       
       <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="mb-8 flex items-center gap-4">
           <Link
             href="/"
@@ -56,24 +93,19 @@ export default function ProfilePage() {
           <h1 className="text-3xl font-bold text-foreground">Thông tin cá nhân</h1>
         </div>
 
-        {/* Profile Card */}
         <div className="rounded-lg border border-border bg-card p-6 sm:p-8">
-          {/* User Avatar */}
           <div className="mb-8 flex justify-center">
             <div className="flex h-24 w-24 items-center justify-center rounded-full bg-accent text-white">
               <User size={48} />
             </div>
           </div>
 
-          {/* User Information */}
           <div className="space-y-6">
-            {/* Name */}
             <div className="border-b border-border pb-4">
               <label className="text-sm font-medium text-muted-foreground">Họ tên</label>
               <p className="mt-2 text-lg text-foreground">{userInfo.name}</p>
             </div>
 
-            {/* Email */}
             <div className="border-b border-border pb-4">
               <div className="flex items-center gap-2">
                 <Mail size={18} className="text-accent" />
@@ -82,7 +114,6 @@ export default function ProfilePage() {
               <p className="mt-2 text-lg text-foreground">{userInfo.email}</p>
             </div>
 
-            {/* Phone */}
             <div className="border-b border-border pb-4">
               <div className="flex items-center gap-2">
                 <Phone size={18} className="text-accent" />
@@ -91,16 +122,12 @@ export default function ProfilePage() {
               <p className="mt-2 text-lg text-foreground">{userInfo.phone}</p>
             </div>
 
-            {/* Role */}
             <div className="pb-4">
               <label className="text-sm font-medium text-muted-foreground">Vai trò</label>
-              <p className="mt-2 text-lg font-semibold text-accent">
-                {userInfo.role}
-              </p>
+              <p className="mt-2 text-lg font-semibold text-accent">{userInfo.role}</p>
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
               href="/profile/edit"
@@ -117,7 +144,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Additional Info */}
         <div className="mt-8 rounded-lg bg-muted/30 p-6">
           <h3 className="mb-2 font-medium text-foreground">Bảo vệ tài khoản</h3>
           <p className="text-sm text-muted-foreground">

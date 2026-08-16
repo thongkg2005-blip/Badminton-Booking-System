@@ -50,7 +50,7 @@ public class AuthController {
         String fullName = req.fullName != null ? req.fullName.trim() : "";
         String username = req.username != null ? req.username.trim() : "";
         String email = req.email != null ? req.email.trim() : "";
-        String phone = req.phone != null ? req.phone.trim() : "";
+        String phone = normalizePhone(req.phone != null ? req.phone : "");
 
         if (fullName.isBlank()) {
             return badRequest("Full name is required");
@@ -105,6 +105,18 @@ public class AuthController {
         public String password;
     }
 
+    public static class ChangePasswordRequest {
+        public String oldPassword;
+        public String newPassword;
+        public String confirmNewPassword;
+    }
+
+    public static class UpdateProfileRequest {
+        public String fullName;
+        public String email;
+        public String phone;
+    }
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest req) {
         if (req == null || req.username == null || req.username.isBlank()
@@ -113,11 +125,11 @@ public class AuthController {
         }
 
         User user = userRepository.findByUsername(req.username.trim())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Username or password is incorrect"));
+                .orElse(null);
 
         var encoder = PasswordUtil.createEncoder();
-        if (!encoder.matches(req.password, user.getPassword())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Username or password is incorrect");
+        if (user == null || !encoder.matches(req.password, user.getPassword())) {
+            return unauthorized("Đăng nhập thất bại");
         }
 
         Map<String, Object> claims = new HashMap<>();
@@ -129,6 +141,131 @@ public class AuthController {
                 "token", token,
                 "user", userResponse(user)
         ));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+            @RequestBody ChangePasswordRequest req
+    ) {
+        String username = resolveUsername(authorizationHeader);
+        if (username == null || username.isBlank()) {
+            return unauthorized("Unauthorized");
+        }
+
+        if (req == null || req.oldPassword == null || req.oldPassword.isBlank()
+                || req.newPassword == null || req.newPassword.isBlank()
+                || req.confirmNewPassword == null || req.confirmNewPassword.isBlank()) {
+            return badRequest("All password fields are required");
+        }
+
+        if (req.newPassword.length() < 6) {
+            return badRequest("Mật khẩu mới phải có ít nhất 6 ký tự");
+        }
+        if (!req.newPassword.matches(".*[A-Za-z].*") || !req.newPassword.matches(".*\\d.*")) {
+            return badRequest("Mật khẩu mới phải có ít nhất 1 chữ cái và 1 chữ số");
+        }
+        if (!req.newPassword.equals(req.confirmNewPassword)) {
+            return badRequest("Xác nhận mật khẩu mới không khớp");
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+        var encoder = PasswordUtil.createEncoder();
+        if (!encoder.matches(req.oldPassword, user.getPassword())) {
+            return badRequest("Mật khẩu cũ không đúng");
+        }
+
+        user.setPassword(encoder.encode(req.newPassword));
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu thành công"));
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+            @RequestBody UpdateProfileRequest req
+    ) {
+        String username = resolveUsername(authorizationHeader);
+        if (username == null || username.isBlank()) {
+            return unauthorized("Unauthorized");
+        }
+        if (req == null) {
+            return badRequest("Request body is required");
+        }
+
+        String fullName = req.fullName != null ? req.fullName.trim() : "";
+        String email = req.email != null ? req.email.trim() : "";
+        String phone = normalizePhone(req.phone != null ? req.phone : "");
+
+        if (fullName.isBlank()) {
+            return badRequest("Ho ten khong duoc de trong");
+        }
+        if (countLetters(fullName) < 2) {
+            return badRequest("Ho ten phai co it nhat 2 chu cai");
+        }
+        if (email.isBlank()) {
+            return badRequest("Email khong duoc de trong");
+        }
+        if (!email.matches(EMAIL_REGEX)) {
+            return badRequest("Email khong hop le");
+        }
+        if (phone.isBlank()) {
+            return badRequest("So dien thoai khong duoc de trong");
+        }
+        if (!phone.matches(VIETNAM_PHONE_REGEX)) {
+            return badRequest("So dien thoai phai gom 10 chu so va bat dau bang 0");
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+        userRepository.findByEmail(email).ifPresent(existing -> {
+            if (!existing.getId().equals(user.getId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email da duoc su dung");
+            }
+        });
+
+        user.setFullName(fullName);
+        user.setEmail(email);
+        user.setPhone(phone);
+
+        User saved = userRepository.save(user);
+        return ResponseEntity.ok(Map.of(
+                "message", "Cap nhat thong tin thanh cong",
+                "user", userResponse(saved)
+        ));
+    }
+
+    @GetMapping("/profile")
+    public ResponseEntity<?> getProfile(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader
+    ) {
+        String username = resolveUsername(authorizationHeader);
+        if (username == null || username.isBlank()) {
+            return unauthorized("Unauthorized");
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+        return ResponseEntity.ok(Map.of("user", userResponse(user)));
+    }
+
+    private long countLetters(String value) {
+        return value.codePoints().filter(Character::isLetter).count();
+    }
+
+    private String normalizePhone(String phone) {
+        String normalized = phone == null ? "" : phone.replaceAll("[\\s\\-\\.\\(\\)]", "");
+        if (normalized.startsWith("+84")) {
+            normalized = "0" + normalized.substring(3);
+        } else if (normalized.startsWith("84") && normalized.length() == 11) {
+            normalized = "0" + normalized.substring(2);
+        }
+        return normalized;
     }
 
     private Map<String, Object> userResponse(User user) {
@@ -145,5 +282,20 @@ public class AuthController {
     private ResponseEntity<Map<String, String>> badRequest(String message) {
         return ResponseEntity.badRequest().body(Map.of("message", message));
     }
-}
 
+    private ResponseEntity<Map<String, String>> unauthorized(String message) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", message));
+    }
+
+    private String resolveUsername(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            return null;
+        }
+
+        try {
+            return jwtUtil().parseClaims(authorizationHeader.substring(7)).getSubject();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+}

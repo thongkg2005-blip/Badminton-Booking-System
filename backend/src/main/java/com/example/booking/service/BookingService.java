@@ -33,6 +33,11 @@ public class BookingService {
     }
 
     public boolean isAvailable(Long courtId, LocalDate date, LocalTime startTime, LocalTime endTime) {
+        Court court = courtRepository.findById(courtId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Court not found: " + courtId));
+        if (court.isMaintenance()) {
+            return false;
+        }
         return !bookingRepository.existsOverlappingBooking(courtId, date, startTime, endTime);
     }
 
@@ -44,7 +49,15 @@ public class BookingService {
         if (!endTime.isAfter(startTime)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End time must be after start time");
         }
-        return bookingRepository.findOccupiedCourtIds(date, startTime, endTime);
+        List<Long> occupiedByBooking = bookingRepository.findOccupiedCourtIds(date, startTime, endTime);
+        List<Long> maintenanceCourtIds = courtRepository.findAll().stream()
+                .filter(Court::isMaintenance)
+                .map(Court::getId)
+                .toList();
+
+        return Stream.concat(occupiedByBooking.stream(), maintenanceCourtIds.stream())
+                .distinct()
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -167,6 +180,14 @@ public class BookingService {
     }
 
     @Transactional
+    public Court updateCourtMaintenance(Long courtId, boolean maintenance) {
+        Court court = courtRepository.findById(courtId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Court not found: " + courtId));
+        court.setMaintenance(maintenance);
+        return courtRepository.save(court);
+    }
+
+    @Transactional
     public Booking confirmBooking(Long bookingId) {
         Booking booking = getBooking(bookingId);
         if (booking.getStatus() == BookingStatus.CANCELLED) {
@@ -185,6 +206,10 @@ public class BookingService {
 
         Court newCourt = courtRepository.findById(newCourtId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Court not found: " + newCourtId));
+
+        if (newCourt.isMaintenance()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Selected court is under maintenance");
+        }
 
         if (booking.getCourt() != null && booking.getCourt().getId().equals(newCourtId)) {
             return booking;
@@ -205,6 +230,9 @@ public class BookingService {
         Court court = courtRepository.findById(courtId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Court not found: " + courtId));
 
+        if (court.isMaintenance()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Court is under maintenance and cannot be blocked");
+        }
         if (!isAvailable(courtId, date, startTime, endTime)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Selected slot is not available");
         }

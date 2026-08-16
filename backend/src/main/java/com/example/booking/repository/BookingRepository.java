@@ -33,7 +33,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
       @Param("startTime") LocalTime startTime);
 
   @Query("""
-      select b.court.id
+      select distinct b.court.id
       from Booking b
       where b.bookingDate = :date
         and b.startTime < :endTime

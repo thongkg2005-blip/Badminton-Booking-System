@@ -209,36 +209,14 @@ export default function AdminPricingPage() {
             )}
           </div>
 
-          <div className="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="rounded-xl border border-border bg-card p-6">
-              <p className="text-sm text-muted-foreground mb-2">Gia cao diem</p>
-              <p className="text-2xl font-bold">
-                {draftPrices.WEEKDAY[6]}k - {draftPrices.SPECIAL_DAY[6]}k
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-card p-6">
-              <p className="text-sm text-muted-foreground mb-2">Gia binh thuong</p>
-              <p className="text-2xl font-bold">
-                {draftPrices.WEEKDAY[0]}k - {draftPrices.SPECIAL_DAY[0]}k
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-card p-6">
-              <p className="text-sm text-muted-foreground mb-2">Chenh lech cuoi tuan</p>
-              <p className="text-2xl font-bold">
-                {draftPrices.WEEKDAY[0] > 0
-                  ? `+${(((draftPrices.WEEKEND[0] - draftPrices.WEEKDAY[0]) / draftPrices.WEEKDAY[0]) * 100).toFixed(0)}%`
-                  : '0%'}
-              </p>
-            </div>
-          </div>
-
+          
           <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-border p-4 flex justify-end gap-4">
             <button
               onClick={handleReset}
               disabled={loading || saving}
               className="rounded-lg border-2 border-border px-6 py-2 font-medium transition-colors hover:border-accent hover:text-accent disabled:opacity-60"
             >
-              Dat lai
+              Đặt Giá Mặc Định
             </button>
             <button
               onClick={handleSave}
@@ -246,7 +224,7 @@ export default function AdminPricingPage() {
               className="inline-flex items-center gap-2 rounded-lg bg-accent text-white px-6 py-2 font-medium transition-colors hover:bg-[rgb(15_110_86)] disabled:opacity-60"
             >
               {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-              {saving ? 'Dang luu...' : 'Luu thay doi'}
+              {saving ? 'Dang luu...' : 'Lưu Thay Đổi'}
             </button>
           </div>
         </div>

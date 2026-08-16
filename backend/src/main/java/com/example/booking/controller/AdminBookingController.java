@@ -1,6 +1,7 @@
 package com.example.booking.controller;
 
 import com.example.booking.model.Booking;
+import com.example.booking.model.Court;
 import com.example.booking.model.BookingStatus;
 import com.example.booking.service.BookingService;
 import org.springframework.http.HttpStatus;
@@ -87,6 +88,24 @@ public class AdminBookingController {
                 "id", booking.getId(),
                 "courtId", booking.getCourt().getId(),
                 "courtName", booking.getCourt().getName()
+        ));
+    }
+
+    public static class UpdateMaintenanceRequest {
+        public Boolean maintenance;
+    }
+
+    @PutMapping("/courts/{id}/maintenance")
+    public ResponseEntity<?> updateCourtMaintenance(@PathVariable Long id, @RequestBody UpdateMaintenanceRequest req) {
+        if (req == null || req.maintenance == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "maintenance is required");
+        }
+        Court court = bookingService.updateCourtMaintenance(id, req.maintenance);
+        return ResponseEntity.ok(Map.of(
+                "id", court.getId(),
+                "name", court.getName(),
+                "code", court.getCode(),
+                "isMaintenance", court.isMaintenance()
         ));
     }
 }

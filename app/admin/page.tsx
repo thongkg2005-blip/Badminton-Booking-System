@@ -4,9 +4,17 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
-import { BarChart3, DollarSign, ShoppingCart, TrendingUp, Loader2 } from 'lucide-react'
+import { BarChart3, DollarSign, ShoppingCart, TrendingUp, Loader2, ShoppingBag } from 'lucide-react'
 import { backendJson } from '@/lib/backend-api'
 import { TIME_SLOTS, getDayType, getPrice, formatCurrency } from '@/lib/booking-pricing'
+
+
+type Court = {
+  id: number
+  name: string
+  code: string
+  maintenance: boolean
+}
 
 type Booking = {
   id: number
@@ -27,6 +35,7 @@ type Booking = {
 
 export default function AdminPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
+  const [courts, setCourts] = useState<Court[]>([])
   const [statsData, setStatsData] = useState({
     totalRevenue: 0,
     totalBookings: 0,
@@ -41,11 +50,13 @@ export default function AdminPage() {
     setError(null)
     Promise.all([
       backendJson<Booking[]>('/admin/bookings'),
-      backendJson<{ total: number; confirmed: number; cancelled: number; blocked: number }>('/admin/bookings/stats')
+      backendJson<{ total: number; confirmed: number; cancelled: number; blocked: number }>('/admin/bookings/stats'),
+      backendJson<Court[]>('/courts'),
     ])
-      .then(([bookingsData, stats]) => {
+      .then(([bookingsData, stats, courtsData]) => {
         setBookings(bookingsData)
-        
+        setCourts(courtsData)
+
         // Calculate revenue
         const revenue = bookingsData
           .filter(b => b.status === 'CONFIRMED')
@@ -58,18 +69,30 @@ export default function AdminPage() {
             return sum + price
           }, 0)
 
+        const maintenanceIds = new Set(courtsData.filter((court) => court.maintenance).map((court) => court.id))
+        const blockedCourtIds = new Set(bookingsData
+          .filter((booking) => booking.status === 'BLOCKED')
+          .map((booking) => booking.court.id))
+
+        const unavailableCourtCount = new Set([
+          ...maintenanceIds,
+          ...blockedCourtIds,
+        ]).size
+
         setStatsData({
           totalRevenue: revenue,
           totalBookings: stats.total,
           activeBookings: stats.confirmed,
-          blockedSlots: stats.blocked,
+          blockedSlots: unavailableCourtCount,
         })
       })
       .catch((err) => {
         console.error('Error fetching admin statistics:', err)
         setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu trang quản trị.')
       })
-      .finally(() => setLoading(false))
+      .finally(() => {
+        setLoading(false)
+      })
   }, [])
 
   const statsList = [
@@ -92,7 +115,7 @@ export default function AdminPage() {
       color: 'text-accent',
     },
     {
-      label: 'Sân đang bị khóa',
+      label: 'Sân không khả dụng',
       value: loading ? '...' : statsData.blockedSlots.toString(),
       icon: BarChart3,
       color: 'text-primary',
@@ -213,12 +236,28 @@ export default function AdminPage() {
               </Link>
 
               <Link
-                href="/shop"
+                href="/admin/shop"
                 className="rounded-xl border-2 border-border bg-card p-6 hover:border-accent transition-all hover:shadow-sm"
               >
                 <h3 className="font-semibold mb-2">Quản lý cửa hàng</h3>
                 <p className="text-sm text-muted-foreground">
                   Cập nhật sản phẩm và giá dụng cụ
+                </p>
+                <div className="mt-4 inline-flex items-center text-accent font-medium">
+                  Mở →
+                </div>
+              </Link>
+
+              <Link
+                href="/admin/order-history"
+                className="rounded-xl border-2 border-border bg-card p-6 hover:border-accent transition-all hover:shadow-sm"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <ShoppingBag size={18} className="text-accent" />
+                  <h3 className="font-semibold">Lịch sử đơn hàng</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Xem và cập nhật trạng thái đơn hàng sản phẩm
                 </p>
                 <div className="mt-4 inline-flex items-center text-accent font-medium">
                   Mở →
