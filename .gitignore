@@ -16,7 +16,4 @@ node_modules
 
 # Maven/Java builds
 backend/target/
-backend/.mvn/
 backend/*.log
-
-/backend
